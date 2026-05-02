@@ -16,7 +16,8 @@ public final class LevelRegistry {
     public static LevelRegistry defaultRegistry() {
         return new LevelRegistry(List.of(
             new LostUpdateLevel(),
-            new AtomicCounterLevel()
+            new AtomicCounterLevel(),
+            new DeadlockKitchenLevel()
         ));
     }
 

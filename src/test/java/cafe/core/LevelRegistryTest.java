@@ -12,9 +12,10 @@ class LevelRegistryTest {
     void defaultRegistryListsLevelsInTeachingOrder() {
         LevelRegistry registry = LevelRegistry.defaultRegistry();
 
-        assertEquals(2, registry.size());
+        assertEquals(3, registry.size());
         assertEquals("lost-update", registry.get(0).id());
         assertEquals("atomic-counter", registry.get(1).id());
+        assertEquals("deadlock-kitchen", registry.get(2).id());
     }
 
     @Test
@@ -23,6 +24,7 @@ class LevelRegistryTest {
 
         assertEquals(0, registry.indexOf("lost-update"));
         assertEquals(1, registry.indexOf("atomic-counter"));
+        assertEquals(2, registry.indexOf("deadlock-kitchen"));
         assertEquals(-1, registry.indexOf("nonexistent"));
     }
 
