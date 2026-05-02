@@ -192,18 +192,46 @@
     </script>
     <script type="module">
       import {EditorView, basicSetup} from "codemirror";
+      import {Decoration} from "@codemirror/view";
+      import {StateEffect, StateField} from "@codemirror/state";
       import {java} from "@codemirror/lang-java";
       import {oneDark} from "@codemirror/theme-one-dark";
 
+      // Active-line decoration: highlighted to show where the simulator just executed.
+      const setActiveLineEffect = StateEffect.define();
+      const activeLineDeco = Decoration.line({class: "cm-cafe-active"});
+      const activeLineField = StateField.define({
+        create: () => Decoration.none,
+        update(deco, tr) {
+          deco = deco.map(tr.changes);
+          for (const e of tr.effects) {
+            if (e.is(setActiveLineEffect)) {
+              if (e.value > 0 && e.value <= tr.state.doc.lines) {
+                const line = tr.state.doc.line(e.value);
+                deco = Decoration.set([activeLineDeco.range(line.from)]);
+              } else {
+                deco = Decoration.none;
+              }
+            }
+          }
+          return deco;
+        },
+        provide: f => EditorView.decorations.from(f)
+      });
+
       const editor = new EditorView({
         parent: document.getElementById('editorContainer'),
-        extensions: [basicSetup, java(), oneDark]
+        extensions: [basicSetup, java(), oneDark, activeLineField]
       });
       window.cafeEditor = editor;
       window.cafeGetCode = () => editor.state.doc.toString();
       window.cafeSetCode = (s) => editor.dispatch({
-        changes: {from: 0, to: editor.state.doc.length, insert: s}
+        changes: {from: 0, to: editor.state.doc.length, insert: s},
+        effects: setActiveLineEffect.of(0)
       });
+      window.cafeSetActiveLine = (line) => {
+        editor.dispatch({effects: setActiveLineEffect.of(line | 0)});
+      };
 
       main();
     </script>

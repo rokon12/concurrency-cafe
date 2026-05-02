@@ -48,6 +48,9 @@ public final class Browser {
     @JSBody(params = { "code" }, script = "if (window.cafeSetCode) window.cafeSetCode(code);")
     public static native void setEditorCode(String code);
 
+    @JSBody(params = { "line" }, script = "if (window.cafeSetActiveLine) window.cafeSetActiveLine(line);")
+    public static native void setActiveLine(int line);
+
     @JSBody(
         params = { "id", "className" },
         script = "document.getElementById(id).className = className;"

@@ -106,6 +106,7 @@ public final class Main {
 
     private static void loadLevel(int index) {
         stopPlay();
+        Browser.setActiveLine(0);
         currentIndex = index;
         failsSinceLastPass = 0;
         hintsRevealed = 0;
@@ -168,6 +169,7 @@ public final class Main {
 
     private static void run() {
         stopPlay();
+        Browser.setActiveLine(0);
         Level level = REGISTRY.get(currentIndex);
         String code = Browser.getEditorCode();
         Browser.setStorage(STORAGE_CODE_PREFIX + level.id(), code);
@@ -285,6 +287,7 @@ public final class Main {
 
     private static void afterStep(Level level) {
         SimulationResult snap = activeSimulator.snapshot();
+        Browser.setActiveLine(activeSimulator.lastStepLine());
         if (activeSimulator.isFinished()) {
             totalTraceSteps = snap.events().size();
             Outcome outcome = level.validate(snap);

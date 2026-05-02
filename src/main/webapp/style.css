@@ -430,6 +430,12 @@ code, pre, .mono { font-family: var(--font-mono); font-feature-settings: 'liga' 
 .editor .cm-activeLine { background: color-mix(in oklab, var(--accent) 8%, transparent); }
 .editor .cm-activeLineGutter { color: var(--accent); }
 
+.editor .cm-cafe-active {
+  background: color-mix(in oklab, var(--accent) 28%, transparent) !important;
+  box-shadow: inset 3px 0 0 var(--accent);
+  transition: background 0.12s ease;
+}
+
 .pane-foot {
   display: flex;
   align-items: center;

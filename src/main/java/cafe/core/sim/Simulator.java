@@ -31,6 +31,7 @@ public final class Simulator {
     private int nextChefIndex;
     private boolean finished;
     private String error;
+    private int lastStepLine;
     private final Map<String, Integer> executorPoolSize = new HashMap<>();
     private final Map<String, Integer> activeExecutorSlots = new HashMap<>();
 
@@ -60,6 +61,15 @@ public final class Simulator {
 
     public boolean isFinished() {
         return finished;
+    }
+
+    /**
+     * Source line of the most recently executed instruction, or 0 if no
+     * instruction has run yet (e.g., right after init or after a step that
+     * only blocked on a lock / pool slot / queue).
+     */
+    public int lastStepLine() {
+        return lastStepLine;
     }
 
 
@@ -226,7 +236,7 @@ public final class Simulator {
             }
             lockOwner.put(l.lockName(), chef.name());
             chef.recordHeld(l.lockName());
-            recordEvent(chef, "acquires lock '" + l.lockName() + "'");
+            recordEvent(chef, l, "acquires lock '" + l.lockName() + "'");
             advanceAndMaybeRelease(chef);
             return true;
         }
@@ -238,7 +248,7 @@ public final class Simulator {
                 );
             }
             lockOwner.remove(u.lockName());
-            recordEvent(chef, "releases lock '" + u.lockName() + "'");
+            recordEvent(chef, u, "releases lock '" + u.lockName() + "'");
             advanceAndMaybeRelease(chef);
             return true;
         }
@@ -246,7 +256,7 @@ public final class Simulator {
         if (next instanceof Instruction.Read r) {
             int value = globals.getOrDefault(r.globalName(), 0);
             chef.setLocal(r.localName(), value);
-            recordEvent(chef, "reads " + r.globalName() + " = " + value);
+            recordEvent(chef, r, "reads " + r.globalName() + " = " + value);
             advanceAndMaybeRelease(chef);
             return true;
         }
@@ -254,7 +264,7 @@ public final class Simulator {
         if (next instanceof Instruction.Write w) {
             int value = evaluate(chef, w.value());
             globals.put(w.globalName(), value);
-            recordEvent(chef, "writes " + w.globalName() + " = " + value);
+            recordEvent(chef, w, "writes " + w.globalName() + " = " + value);
             advanceAndMaybeRelease(chef);
             return true;
         }
@@ -262,7 +272,7 @@ public final class Simulator {
         if (next instanceof Instruction.AtomicInc a) {
             int value = globals.getOrDefault(a.globalName(), 0) + 1;
             globals.put(a.globalName(), value);
-            recordEvent(chef, "atomically increments " + a.globalName() + " to " + value);
+            recordEvent(chef, a, "atomically increments " + a.globalName() + " to " + value);
             advanceAndMaybeRelease(chef);
             return true;
         }
@@ -271,7 +281,7 @@ public final class Simulator {
             int delta = evaluate(chef, a.delta());
             int value = globals.getOrDefault(a.globalName(), 0) + delta;
             globals.put(a.globalName(), value);
-            recordEvent(chef, "atomically adds " + delta + " to " + a.globalName() + " (now " + value + ")");
+            recordEvent(chef, a, "atomically adds " + delta + " to " + a.globalName() + " (now " + value + ")");
             advanceAndMaybeRelease(chef);
             return true;
         }
@@ -282,9 +292,9 @@ public final class Simulator {
             if (current == expected) {
                 int newVal = evaluate(chef, c.newValue());
                 globals.put(c.globalName(), newVal);
-                recordEvent(chef, "CAS " + c.globalName() + ": " + expected + " → " + newVal + " (success)");
+                recordEvent(chef, c, "CAS " + c.globalName() + ": " + expected + " → " + newVal + " (success)");
             } else {
-                recordEvent(chef, "CAS " + c.globalName() + ": expected " + expected + ", saw " + current + " (failure)");
+                recordEvent(chef, c, "CAS " + c.globalName() + ": expected " + expected + ", saw " + current + " (failure)");
             }
             advanceAndMaybeRelease(chef);
             return true;
@@ -292,6 +302,7 @@ public final class Simulator {
 
         if (next instanceof Instruction.Log lg) {
             chef.lastEventDetail = "logs: " + lg.message();
+            this.lastStepLine = lg.line();
             log(chef.name() + ": " + lg.message());
             advanceAndMaybeRelease(chef);
             return true;
@@ -300,7 +311,7 @@ public final class Simulator {
         if (next instanceof Instruction.LocalSet ls) {
             int value = evaluate(chef, ls.value());
             chef.setLocal(ls.localName(), value);
-            recordEvent(chef, "sets " + ls.localName() + " = " + value);
+            recordEvent(chef, ls, "sets " + ls.localName() + " = " + value);
             advanceAndMaybeRelease(chef);
             return true;
         }
@@ -316,7 +327,7 @@ public final class Simulator {
             }
             int value = evaluate(chef, put.value());
             q.addLast(value);
-            recordEvent(chef, "puts " + value + " into " + put.queueName()
+            recordEvent(chef, put, "puts " + value + " into " + put.queueName()
                 + " (size " + q.size() + "/" + cap + ")");
             advanceAndMaybeRelease(chef);
             return true;
@@ -333,7 +344,7 @@ public final class Simulator {
             int value = q.removeFirst();
             chef.setLocal(take.localName(), value);
             int cap = queueCapacity.getOrDefault(take.queueName(), Integer.MAX_VALUE);
-            recordEvent(chef, "takes " + value + " from " + take.queueName()
+            recordEvent(chef, take, "takes " + value + " from " + take.queueName()
                 + " (size " + q.size() + "/" + cap + ")");
             advanceAndMaybeRelease(chef);
             return true;
@@ -342,8 +353,9 @@ public final class Simulator {
         throw new SimulationException("Unknown instruction: " + next);
     }
 
-    private void recordEvent(ChefState chef, String detail) {
+    private void recordEvent(ChefState chef, Instruction instr, String detail) {
         chef.lastEventDetail = detail;
+        this.lastStepLine = instr.line();
         log(chef.name() + " " + detail);
     }
 
