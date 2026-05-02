@@ -1,5 +1,9 @@
 package cafe.core;
 
+import cafe.core.levels.AtomicCounterLevel;
+import cafe.core.levels.DeadlockKitchenLevel;
+import cafe.core.levels.LostUpdateLevel;
+
 import java.util.List;
 
 public record LevelRegistry(List<Level> levels) {
@@ -11,11 +15,16 @@ public record LevelRegistry(List<Level> levels) {
         this.levels = List.copyOf(levels);
     }
 
+    /**
+     * The shipped sequence of levels, in teaching order. Add new levels here.
+     * Each entry is a class in {@code cafe.core.levels}; see
+     * {@code src/main/java/cafe/core/levels/README.md} for the recipe.
+     */
     public static LevelRegistry defaultRegistry() {
         return new LevelRegistry(List.of(
-                new LostUpdateLevel(),
-                new AtomicCounterLevel(),
-                new DeadlockKitchenLevel()
+            new LostUpdateLevel(),
+            new AtomicCounterLevel(),
+            new DeadlockKitchenLevel()
         ));
     }
 

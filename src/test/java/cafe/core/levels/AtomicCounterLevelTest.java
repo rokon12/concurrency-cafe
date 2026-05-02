@@ -1,5 +1,6 @@
-package cafe.core;
+package cafe.core.levels;
 
+import cafe.core.Outcome;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;

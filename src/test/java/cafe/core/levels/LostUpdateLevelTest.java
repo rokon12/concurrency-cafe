@@ -1,5 +1,6 @@
-package cafe.core;
+package cafe.core.levels;
 
+import cafe.core.Outcome;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -65,6 +66,6 @@ class LostUpdateLevelTest {
 
         assertTrue(full.contains("public class LostUpdateLesson"));
         assertTrue(full.contains("static int counter = 41"));
-        assertTrue(full.contains("static Object counterLock = new Object()"));
+        assertTrue(full.contains("static final Object counterLock = new Object()"));
     }
 }
