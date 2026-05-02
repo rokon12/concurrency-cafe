@@ -31,9 +31,14 @@ public final class Main {
     private static Simulator activeSimulator;
     private static String activeSimulatorCode;
 
+    private static final int PLAY_TICK_MS = 500;
+    private static boolean playing;
+    private static int playTimerId = -1;
+
     public static void main(String[] args) {
         Browser.onClick("runBtn", Main::run);
         Browser.onClick("stepBtn", Main::step);
+        Browser.onClick("playBtn", Main::togglePlay);
         Browser.onClick("resetBtn", Main::reset);
         Browser.onClick("resetProgressBtn", Main::resetAllProgress);
         Browser.onClick("showSourceBtn", Main::toggleFullSource);
@@ -72,6 +77,7 @@ public final class Main {
     }
 
     private static void loadLevel(int index) {
+        stopPlay();
         currentIndex = index;
         failsSinceLastPass = 0;
         hintsRevealed = 0;
@@ -118,6 +124,7 @@ public final class Main {
     }
 
     private static void run() {
+        stopPlay();
         Level level = REGISTRY.get(currentIndex);
         String code = Browser.getValue("editor");
         Browser.setStorage(STORAGE_CODE_PREFIX + level.id(), code);
@@ -127,6 +134,53 @@ public final class Main {
         Outcome outcome = level.run(code);
         renderOutcome(outcome, level);
         renderSchedulePanel();
+    }
+
+    private static void togglePlay() {
+        if (playing) {
+            stopPlay();
+            return;
+        }
+        if (!ensureActiveSimulator()) {
+            return;
+        }
+        playing = true;
+        Browser.setText("playBtn", "Pause");
+        schedulePlayTick();
+    }
+
+    private static void stopPlay() {
+        playing = false;
+        Browser.setText("playBtn", "Play");
+        if (playTimerId != -1) {
+            Browser.clearTimeout(playTimerId);
+            playTimerId = -1;
+        }
+    }
+
+    private static void schedulePlayTick() {
+        playTimerId = Browser.setTimeout(Main::playTick, PLAY_TICK_MS);
+    }
+
+    private static void playTick() {
+        playTimerId = -1;
+        if (!playing || activeSimulator == null) {
+            return;
+        }
+        Level level = REGISTRY.get(currentIndex);
+        try {
+            activeSimulator.stepInstruction();
+        } catch (SimulationException e) {
+            stopPlay();
+            renderOutcome(new Outcome(false, "Runtime error", null, List.of(e.getMessage())), level);
+            return;
+        }
+        afterStep(level);
+        if (activeSimulator == null || activeSimulator.isFinished()) {
+            stopPlay();
+        } else {
+            schedulePlayTick();
+        }
     }
 
     private static void step() {

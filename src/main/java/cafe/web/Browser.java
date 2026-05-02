@@ -97,6 +97,18 @@ public final class Browser {
     public static native boolean confirm(String message);
 
     @JSBody(
+        params = { "callback", "ms" },
+        script = "return window.setTimeout(callback, ms);"
+    )
+    public static native int setTimeout(Callback callback, int ms);
+
+    @JSBody(
+        params = { "id" },
+        script = "window.clearTimeout(id);"
+    )
+    public static native void clearTimeout(int id);
+
+    @JSBody(
         params = { "filename", "content" },
         script =
             "var blob = new Blob([content], {type: 'text/x-java-source;charset=utf-8'});" +
