@@ -1,89 +1,174 @@
 <!doctype html>
-<html>
+<html lang="en">
   <head>
     <meta charset="utf-8">
     <title>Concurrency Café</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Fraunces:opsz,wght@9..144,400;9..144,600&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="style.css">
     <script src="js/cafe.js"></script>
   </head>
 
   <body>
-    <main class="page">
-      <header>
-        <h1>Concurrency Café</h1>
-        <p id="levelTitle" class="subtitle"></p>
-      </header>
-
-      <nav id="breadcrumb" class="breadcrumb"></nav>
-
-      <div class="controls progress-controls">
-        <button id="resetProgressBtn" class="secondary danger">Clear all progress</button>
+    <header class="topbar">
+      <a href="#" class="brand">
+        <span class="brand-mark">cc</span>
+        <span>Concurrency Café</span>
+      </a>
+      <div class="spacer"></div>
+      <div class="right">
+        <button id="resetProgressBtn" class="ghost-btn" title="Clear all completed levels and saved code">Clear progress</button>
+        <button id="themeBtn" class="ghost-btn" title="Toggle theme">☾</button>
       </div>
+    </header>
 
-      <section class="panel">
-        <p id="levelIntro" class="intro"></p>
-        <div id="statusBanner" class="status-banner status-idle">Ready</div>
-        <div class="controls nav-controls">
-          <button id="prevBtn" class="secondary">← Previous level</button>
-          <button id="nextBtn" class="secondary">Next level →</button>
+    <section class="lesson-header">
+      <div class="lh-left">
+        <div class="lh-meta">
+          <span class="chapter-tag" id="levelChapter">Chapter I · Shared state</span>
+          <span class="dot-sep">·</span>
+          <span id="levelNumber">Level 01 of 03</span>
         </div>
-      </section>
+        <h1 class="lh-title" id="levelTitle">Lost Update</h1>
+        <p class="lh-goal" id="levelIntro"></p>
+      </div>
+      <div class="lh-right">
+        <div class="objective-card">
+          <div class="oc-head">Objective</div>
+          <div class="oc-state" id="objectiveState">
+            <span class="pill muted">untested</span>
+            <span>Run the code to see the bug.</span>
+          </div>
+          <div class="oc-progress">
+            <div class="oc-step">
+              <span class="oc-dot" id="objectiveStepRun"></span>
+              <span>Run starter</span>
+            </div>
+            <div class="oc-step">
+              <span class="oc-dot" id="objectiveStepPass"></span>
+              <span id="objectiveGoalLabel">Counter ends at 43</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
 
-      <section class="panel">
-        <h2>Your code</h2>
-        <p class="hint-line">Each <code>Thread.ofVirtual().start(() -&gt; { ... })</code> is one chef. This level pre-declares <code>int counter = 41;</code> and <code>Object counterLock = new Object();</code>. Click <em>Show full Java source</em> to see the wrapping class.</p>
+    <div class="breadcrumb-row">
+      <nav class="breadcrumb" id="breadcrumb"></nav>
+      <div class="spacer" style="flex:1"></div>
+    </div>
+
+    <main class="lesson-grid">
+      <section class="pane pane-code">
+        <div class="pane-head">
+          <span class="dot" style="background: var(--accent)"></span>
+          <span id="paneCodeFile">lost-update.java</span>
+          <span class="pane-head-meta" id="paneCodeMeta">int</span>
+          <div class="spacer" style="flex:1"></div>
+          <button id="resetBtn" class="btn ghost sm">Reset starter</button>
+          <button id="showSourceBtn" class="btn ghost sm">Show full source</button>
+          <button id="downloadBtn" class="btn ghost sm">Download .java</button>
+        </div>
         <div id="editorContainer" class="editor"></div>
-        <div class="controls">
-          <button id="runBtn">Run to end</button>
-          <button id="stepBtn">Step</button>
-          <button id="playBtn">Play</button>
-          <button id="resetBtn" class="secondary">Reset to starter</button>
-          <button id="showSourceBtn" class="secondary">Show full Java source</button>
-          <button id="downloadBtn" class="secondary">Download .java</button>
+        <div class="pane-foot">
+          <button id="runBtn" class="btn primary">▶ Run to end</button>
+          <button id="playBtn" class="btn">↻ Play</button>
+          <button id="stepBtn" class="btn">→ Step</button>
+          <div class="spacer" style="flex:1"></div>
+          <span class="run-meta" id="stepCounter">step 0 / 0</span>
         </div>
-        <p class="hint-line"><strong>Step</strong> advances exactly one chef instruction (skipping any chef that's blocked on a lock). Editing the code resets stepping.</p>
       </section>
 
-      <section id="fullSourcePanel" class="panel hidden">
-        <h2>Full Java source</h2>
-        <p class="hint-line">This is what your code looks like inside a runnable Java class. Copy it into a <code>.java</code> file and it compiles on Java 21+.</p>
-        <pre><code id="fullSource"></code></pre>
-      </section>
-
-      <section id="schedulePanel" class="panel hidden">
-        <h2>Schedule</h2>
-        <p class="hint-line">Click a chef to advance only that thread by one instruction. Build your own interleaving.</p>
-        <div id="scheduleControls" class="schedule-controls"></div>
-      </section>
-
-      <section class="panel">
-        <h2>Result</h2>
-        <div id="metrics"></div>
-      </section>
-
-      <section class="panel">
-        <h2>Kitchen Event Log</h2>
-        <div id="eventLog"></div>
-      </section>
-
-      <section class="panel" id="hintWrap">
-        <div id="hintPanel"></div>
-      </section>
-
-      <section class="panel reference">
-        <h2>Java reference</h2>
-        <p class="hint-line">The shared variables for this level are typed. Operations must match the declared type — the parser will tell you if you mismatch.</p>
-        <ul>
-          <li><code>Thread.ofVirtual().start(() -&gt; { ... });</code> — start a virtual thread chef</li>
-          <li><code>Thread.ofPlatform().start(() -&gt; { ... });</code> — start a platform thread chef</li>
-          <li><strong>int</strong>: <code>int x = v;</code>, <code>v = expr;</code>, <code>v++</code>, <code>v += n</code></li>
-          <li><strong>AtomicInteger</strong>: <code>v.incrementAndGet();</code>, <code>v.set(n);</code></li>
-          <li><strong>Object monitor</strong>: <code>synchronized (m) { ... }</code></li>
-          <li><strong>ReentrantLock</strong>: <code>l.lock();</code> / <code>l.unlock();</code></li>
-          <li><code>System.out.println("...");</code> — emit a log line</li>
-        </ul>
+      <section class="pane pane-sim">
+        <div class="pane-head">
+          <span class="dot" id="simStatusDot" style="background: var(--fg-3)"></span>
+          <span>kitchen</span>
+          <div class="tabs">
+            <button class="tab on" id="tabViz" data-tab="viz">Visual</button>
+            <button class="tab" id="tabLog" data-tab="log">Event log</button>
+          </div>
+        </div>
+        <div class="sim-body">
+          <div id="kitchenView" class="kitchen"></div>
+          <ol id="eventLog" class="event-log" style="display:none"></ol>
+        </div>
+        <div id="resultBar" class="result-bar">
+          <span class="pill muted">idle</span>
+          <span>Run the code to begin.</span>
+        </div>
       </section>
     </main>
+
+    <div id="fullSourcePanel" class="full-source-panel hidden">
+      <pre><code id="fullSource"></code></pre>
+    </div>
+
+    <div class="aux-rail">
+      <details class="aux-card" id="hintCard">
+        <summary>
+          <span class="aux-icon">💡</span>
+          <span>Hint</span>
+          <span class="aux-meta" id="hintMeta">tap to reveal</span>
+        </summary>
+        <div class="aux-body" id="hintBody">
+          <p class="hint-empty">Run a couple of times — hints unlock after two failed attempts.</p>
+        </div>
+      </details>
+
+      <details class="aux-card" open>
+        <summary>
+          <span class="aux-icon">📖</span>
+          <span>Java reference</span>
+          <span class="aux-meta">type-aware</span>
+        </summary>
+        <div class="aux-body">
+          <table class="ref-table">
+            <tbody>
+              <tr><td><code>Thread.ofVirtual().start(() -&gt; {…})</code></td><td>start a virtual thread chef</td></tr>
+              <tr><td><code>Thread.ofPlatform().start(() -&gt; {…})</code></td><td>start a platform thread chef</td></tr>
+              <tr><td><code>int x = expr;   v += n   v++</code></td><td>operations on int</td></tr>
+              <tr><td><code>v.incrementAndGet() / .addAndGet(n)</code></td><td>AtomicInteger atomics</td></tr>
+              <tr><td><code>v.compareAndSet(old, new)</code></td><td>AtomicInteger CAS</td></tr>
+              <tr><td><code>int x = v.get();</code></td><td>AtomicInteger read</td></tr>
+              <tr><td><code>synchronized (m) {…}</code></td><td>Object monitor</td></tr>
+              <tr><td><code>l.lock(); / l.unlock();</code></td><td>ReentrantLock</td></tr>
+              <tr><td><code>System.out.println("…")</code></td><td>emit a log line</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </details>
+
+      <a class="aux-card book-cta" href="#" id="bookCta">
+        <div class="book-mini-cover"><span>cc</span></div>
+        <div>
+          <div class="book-cta-eyebrow">Companion book</div>
+          <div class="book-cta-title">Modern Concurrency in Java</div>
+          <div class="book-cta-desc">320 pages on the JMM, virtual threads, structured concurrency.</div>
+        </div>
+        <div class="book-cta-arrow">→</div>
+      </a>
+    </div>
+
+    <div class="lesson-footer">
+      <span class="footer-note" id="footerNote">Stuck? Open the hint panel above.</span>
+      <div class="spacer"></div>
+      <button id="prevBtn" class="btn ghost">← Previous level</button>
+      <button id="nextBtn" class="btn">Next level →</button>
+    </div>
+
+    <div id="successOverlay" class="overlay hidden">
+      <div class="overlay-card">
+        <div class="overlay-eyebrow" id="overlayEyebrow">Level complete</div>
+        <h2 id="overlayTitle">Race sealed.</h2>
+        <p id="overlayBody">You fixed the bug. Pick your next level.</p>
+        <div class="overlay-actions">
+          <button id="overlayCloseBtn" class="btn ghost">Stay here</button>
+          <button id="overlayNextBtn" class="btn primary">Next level →</button>
+        </div>
+      </div>
+    </div>
 
     <script type="importmap">
     {
@@ -97,6 +182,7 @@
         "@codemirror/autocomplete": "https://esm.sh/@codemirror/autocomplete@6.18.3?external=@codemirror/state,@codemirror/view,@codemirror/language,@lezer/common",
         "@codemirror/lint": "https://esm.sh/@codemirror/lint@6.8.4?external=@codemirror/state,@codemirror/view",
         "@codemirror/lang-java": "https://esm.sh/@codemirror/lang-java@6.0.1?external=@codemirror/state,@codemirror/view,@codemirror/language,@lezer/common,@lezer/highlight,@lezer/lr,@lezer/java",
+        "@codemirror/theme-one-dark": "https://esm.sh/@codemirror/theme-one-dark@6.1.2?external=@codemirror/state,@codemirror/view,@codemirror/language,@lezer/highlight",
         "@lezer/common": "https://esm.sh/@lezer/common@1.2.3",
         "@lezer/highlight": "https://esm.sh/@lezer/highlight@1.2.1?external=@lezer/common",
         "@lezer/lr": "https://esm.sh/@lezer/lr@1.4.2?external=@lezer/common",
@@ -107,10 +193,11 @@
     <script type="module">
       import {EditorView, basicSetup} from "codemirror";
       import {java} from "@codemirror/lang-java";
+      import {oneDark} from "@codemirror/theme-one-dark";
 
       const editor = new EditorView({
         parent: document.getElementById('editorContainer'),
-        extensions: [basicSetup, java()]
+        extensions: [basicSetup, java(), oneDark]
       });
       window.cafeEditor = editor;
       window.cafeGetCode = () => editor.state.doc.toString();

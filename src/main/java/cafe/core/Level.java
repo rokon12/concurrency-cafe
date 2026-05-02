@@ -29,6 +29,14 @@ public interface Level {
 
     String lessonClassName();
 
+    default String chapter() {
+        return "Chapter I · Shared state";
+    }
+
+    default String passingCondition() {
+        return "Pass the level";
+    }
+
     Outcome validate(SimulationResult sim);
 
     default Map<String, Integer> initialGlobals() {

@@ -78,6 +78,16 @@ public final class DeadlockKitchenLevel implements Level {
     }
 
     @Override
+    public String chapter() {
+        return "Chapter II · Locks & coordination";
+    }
+
+    @Override
+    public String passingCondition() {
+        return "Both chefs plate a dish — no deadlock";
+    }
+
+    @Override
     public String fullSourceWith(String userCode) {
         StringBuilder sb = new StringBuilder();
         sb.append("public class DeadlockKitchen {\n");

@@ -3,6 +3,7 @@ package cafe.web;
 import cafe.core.Level;
 import cafe.core.LevelRegistry;
 import cafe.core.Outcome;
+import cafe.core.SharedType;
 import cafe.core.dsl.ParseException;
 import cafe.core.sim.SimulationException;
 import cafe.core.sim.SimulationResult;
@@ -10,14 +11,17 @@ import cafe.core.sim.Simulator;
 
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 public final class Main {
 
     private static final int HINT_AFTER_FAILS = 2;
+    private static final int PLAY_TICK_MS = 500;
 
     private static final String STORAGE_COMPLETED = "cc.completed";
     private static final String STORAGE_CURRENT = "cc.current";
+    private static final String STORAGE_THEME = "cc.theme";
     private static final String STORAGE_CODE_PREFIX = "cc.code.";
 
     private static final LevelRegistry REGISTRY = LevelRegistry.defaultRegistry();
@@ -27,11 +31,13 @@ public final class Main {
     private static int failsSinceLastPass;
     private static int hintsRevealed;
     private static boolean fullSourceVisible;
+    private static String activeTab = "viz";
+    private static String theme = "dark";
 
     private static Simulator activeSimulator;
     private static String activeSimulatorCode;
+    private static int totalTraceSteps;
 
-    private static final int PLAY_TICK_MS = 500;
     private static boolean playing;
     private static int playTimerId = -1;
 
@@ -45,10 +51,17 @@ public final class Main {
         Browser.onClick("downloadBtn", Main::downloadJava);
         Browser.onClick("prevBtn", Main::goToPrevious);
         Browser.onClick("nextBtn", Main::goToNext);
+        Browser.onClick("themeBtn", Main::toggleTheme);
+        Browser.onClick("overlayCloseBtn", Main::closeOverlay);
+        Browser.onClick("overlayNextBtn", Main::overlayNext);
         Browser.onClickInside("breadcrumb", "data-level-index", Main::switchToLevel);
-        Browser.onClickInside("scheduleControls", "data-chef-index", Main::stepSpecificChef);
+        Browser.onClickInside("kitchenView", "data-chef-index", Main::stepSpecificChef);
+        Browser.onClickInside("simTabs", "data-tab-key", Main::switchTab);
+        Browser.onClick("tabViz", () -> setTab("viz"));
+        Browser.onClick("tabLog", () -> setTab("log"));
 
         loadProgressFromStorage();
+        applyTheme();
 
         String savedId = Browser.getStorage(STORAGE_CURRENT);
         int startIndex = 0;
@@ -70,10 +83,25 @@ public final class Main {
                 }
             }
         }
+        String savedTheme = Browser.getStorage(STORAGE_THEME);
+        if (savedTheme != null && (savedTheme.equals("dark") || savedTheme.equals("light"))) {
+            theme = savedTheme;
+        }
     }
 
     private static void saveCompleted() {
         Browser.setStorage(STORAGE_COMPLETED, String.join(",", COMPLETED));
+    }
+
+    private static void applyTheme() {
+        Browser.setDataAttribute("html", "data-theme", theme);
+        Browser.setText("themeBtn", theme.equals("dark") ? "☾" : "☀");
+    }
+
+    private static void toggleTheme() {
+        theme = theme.equals("dark") ? "light" : "dark";
+        Browser.setStorage(STORAGE_THEME, theme);
+        applyTheme();
     }
 
     private static void loadLevel(int index) {
@@ -84,6 +112,7 @@ public final class Main {
         fullSourceVisible = false;
         activeSimulator = null;
         activeSimulatorCode = null;
+        totalTraceSteps = 0;
         Level level = REGISTRY.get(currentIndex);
         Browser.setStorage(STORAGE_CURRENT, level.id());
 
@@ -92,20 +121,34 @@ public final class Main {
             ? savedCode
             : level.starterCode();
 
-        Browser.setText("levelTitle", level.title());
-        Browser.setText("levelIntro", level.intro());
+        Browser.setText("levelTitle", stripPrefix(level.title()));
+        Browser.setText("levelChapter", level.chapter());
+        Browser.setText("levelNumber",
+            "Level " + pad2(currentIndex + 1) + " of " + pad2(REGISTRY.size()));
+        Browser.setText("paneCodeFile", level.id() + ".java");
+        Browser.setText("paneCodeMeta", primaryTypeLabel(level));
+        Browser.setHtml("levelIntro", introWithHighlights(level.intro()));
+        Browser.setText("objectiveGoalLabel", level.passingCondition());
         Browser.setEditorCode(editorContent);
-        Browser.setHtml("metrics", "<p>Press <strong>Run to end</strong> for the full simulation, or <strong>Step</strong> to advance one round at a time.</p>");
-        Browser.setHtml("eventLog", "<p>No events yet.</p>");
-        Browser.setHtml("hintPanel", "");
-        Browser.setClassName("statusBanner",
-            COMPLETED.contains(level.id()) ? "status-banner status-pass" : "status-banner status-idle");
-        Browser.setText("statusBanner",
-            COMPLETED.contains(level.id()) ? "Already completed — feel free to revisit." : "Ready");
+
+        renderInitialState(level);
         renderFullSource();
         renderBreadcrumb();
         renderNavButtons();
+        renderHintCard();
+        Browser.setClassName("successOverlay", "overlay hidden");
         renderSchedulePanel();
+    }
+
+    private static void renderInitialState(Level level) {
+        Browser.setHtml("kitchenView", emptyKitchenHtml(level));
+        Browser.setHtml("eventLog", "");
+        Browser.setHtml("resultBar", idleResultHtml());
+        Browser.setText("stepCounter", "step 0 / 0");
+        setObjectiveState(false, false);
+        renderFooterNote(false);
+        Browser.setClassName("simStatusDot", "dot");
+        Browser.setHtmlAttribute("simStatusDot", "style", "background: var(--fg-3)");
     }
 
     private static void reset() {
@@ -130,8 +173,12 @@ public final class Main {
         Browser.setStorage(STORAGE_CODE_PREFIX + level.id(), code);
         activeSimulator = null;
         activeSimulatorCode = null;
+        totalTraceSteps = 0;
 
         Outcome outcome = level.run(code);
+        if (outcome.simulation() != null) {
+            totalTraceSteps = outcome.simulation().events().size();
+        }
         renderOutcome(outcome, level);
         renderSchedulePanel();
     }
@@ -145,13 +192,13 @@ public final class Main {
             return;
         }
         playing = true;
-        Browser.setText("playBtn", "Pause");
+        Browser.setText("playBtn", "⏸ Pause");
         schedulePlayTick();
     }
 
     private static void stopPlay() {
         playing = false;
-        Browser.setText("playBtn", "Play");
+        Browser.setText("playBtn", "↻ Play");
         if (playTimerId != -1) {
             Browser.clearTimeout(playTimerId);
             playTimerId = -1;
@@ -225,6 +272,7 @@ public final class Main {
             try {
                 activeSimulator = level.startSimulation(code);
                 activeSimulatorCode = code;
+                totalTraceSteps = 0;
             } catch (ParseException e) {
                 activeSimulator = null;
                 activeSimulatorCode = null;
@@ -238,10 +286,11 @@ public final class Main {
     private static void afterStep(Level level) {
         SimulationResult snap = activeSimulator.snapshot();
         if (activeSimulator.isFinished()) {
+            totalTraceSteps = snap.events().size();
             Outcome outcome = level.validate(snap);
             renderOutcome(outcome, level);
         } else {
-            renderInProgress(snap);
+            renderInProgress(snap, level);
         }
         renderSchedulePanel();
     }
@@ -271,6 +320,18 @@ public final class Main {
         }
     }
 
+    private static void overlayNext() {
+        Browser.setClassName("successOverlay", "overlay hidden");
+        if (currentIndex < REGISTRY.size() - 1 && isAccessible(currentIndex + 1)) {
+            saveCurrentEditor();
+            loadLevel(currentIndex + 1);
+        }
+    }
+
+    private static void closeOverlay() {
+        Browser.setClassName("successOverlay", "overlay hidden");
+    }
+
     private static void saveCurrentEditor() {
         Level level = REGISTRY.get(currentIndex);
         Browser.setStorage(STORAGE_CODE_PREFIX + level.id(), Browser.getEditorCode());
@@ -292,144 +353,245 @@ public final class Main {
         renderFullSource();
 
         if (outcome.hasErrors()) {
-            renderErrors(outcome);
+            renderErrors(outcome, level);
             failsSinceLastPass++;
-            maybeRevealHint(level);
+            maybeRevealHint();
             renderBreadcrumb();
             renderNavButtons();
+            renderFooterNote(false);
             return;
         }
 
         SimulationResult sim = outcome.simulation();
-        renderSnapshotMetrics(outcome, sim);
+        renderKitchen(sim, level);
         renderEventLog(sim);
+        renderResultBar(outcome, sim, true);
+        renderStepCounter(sim);
 
-        if (outcome.passed()) {
-            if (!COMPLETED.contains(level.id())) {
+        boolean passed = outcome.passed();
+        setObjectiveState(true, passed);
+        Browser.setHtmlAttribute("simStatusDot", "style",
+            "background: " + (passed ? "var(--ok)" : "var(--err)"));
+
+        if (passed) {
+            boolean firstTime = !COMPLETED.contains(level.id());
+            if (firstTime) {
                 COMPLETED.add(level.id());
                 saveCompleted();
             }
             failsSinceLastPass = 0;
             hintsRevealed = 0;
-            Browser.setClassName("statusBanner", "status-banner status-pass");
-            String banner = currentIndex < REGISTRY.size() - 1
-                ? "Level complete — click Next to continue"
-                : "Level complete — you've cleared the kitchen";
-            Browser.setText("statusBanner", banner);
+            renderHintCard();
+            if (firstTime) {
+                showSuccessOverlay(level);
+            }
         } else {
             failsSinceLastPass++;
-            maybeRevealHint(level);
-            Browser.setClassName("statusBanner", "status-banner status-fail");
-            Browser.setText("statusBanner", "Bug still there. Keep editing.");
+            maybeRevealHint();
         }
         renderBreadcrumb();
         renderNavButtons();
+        renderFooterNote(passed);
     }
 
-    private static void renderSchedulePanel() {
-        if (activeSimulator == null || activeSimulator.isFinished()) {
-            Browser.setClassName("schedulePanel", "panel hidden");
-            Browser.setHtml("scheduleControls", "");
-            return;
-        }
-        Browser.setClassName("schedulePanel", "panel");
-        StringBuilder sb = new StringBuilder();
-        for (Simulator.ChefSnapshot chef : activeSimulator.chefSnapshots()) {
-            String classes = "chef-step";
-            String label = chef.name();
-            boolean disabled = chef.done();
-            if (chef.done()) {
-                classes += " done";
-                label += " (done)";
-            } else if (chef.blockedOnLock() != null) {
-                classes += " blocked";
-                label += " (waiting on " + chef.blockedOnLock() + ")";
-            }
-            sb.append("<button class=\"").append(classes).append("\"")
-                .append(" data-chef-index=\"").append(chef.index()).append("\"")
-                .append(disabled ? " disabled" : "")
-                .append(">")
-                .append(escape(label))
-                .append("</button>");
-        }
-        Browser.setHtml("scheduleControls", sb.toString());
-    }
-
-    private static void renderInProgress(SimulationResult snap) {
+    private static void renderInProgress(SimulationResult snap, Level level) {
         renderFullSource();
-        StringBuilder metrics = new StringBuilder();
-        metrics.append("<p><strong>Stepping…</strong> ").append(snap.events().size())
-            .append(" event").append(snap.events().size() == 1 ? "" : "s").append(" so far.</p>");
-        metrics.append("<p><strong>Current state:</strong></p><ul>");
-        snap.finalGlobals().forEach((k, v) ->
-            metrics.append("<li>").append(escape(k)).append(" = ").append(v).append("</li>"));
-        metrics.append("</ul>");
-        Browser.setHtml("metrics", metrics.toString());
+        renderKitchen(snap, level);
         renderEventLog(snap);
-
-        Browser.setClassName("statusBanner", "status-banner status-idle");
-        Browser.setText("statusBanner", "Stepping — click Step again to advance, or Run to end.");
+        renderStepCounter(snap);
+        Browser.setHtml("resultBar",
+            "<span class=\"pill warn\">running</span><span>"
+                + escape(stepLabel(snap)) + " · counter = "
+                + escape(currentCounterText(snap, level)) + "</span>");
+        Browser.setHtmlAttribute("simStatusDot", "style", "background: var(--warn)");
+        setObjectiveState(true, false);
     }
 
-    private static void renderSnapshotMetrics(Outcome outcome, SimulationResult sim) {
-        StringBuilder metrics = new StringBuilder();
-        metrics.append("<p><strong>").append(outcome.passed() ? "✅ Pass" : "❌ Fail")
-            .append(":</strong> ").append(escape(outcome.summary())).append("</p>");
-        metrics.append("<p><strong>Final state:</strong></p><ul>");
-        sim.finalGlobals().forEach((k, v) ->
-            metrics.append("<li>").append(escape(k)).append(" = ").append(v).append("</li>"));
-        metrics.append("</ul>");
-        Browser.setHtml("metrics", metrics.toString());
+    private static void renderErrors(Outcome outcome, Level level) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("<div class=\"chef-card\" style=\"grid-column: 1 / -1\">");
+        sb.append("<div class=\"chef-card-head\" style=\"color: var(--err)\">");
+        sb.append("<span class=\"chef-dot\" style=\"background: var(--err)\"></span>");
+        sb.append("<span>Could not run your code</span>");
+        sb.append("</div>");
+        sb.append("<div class=\"chef-action\" style=\"white-space: pre-wrap\">");
+        for (String err : outcome.errors()) {
+            sb.append(escape(err)).append("\n");
+        }
+        sb.append("</div></div>");
+        Browser.setHtml("kitchenView", sb.toString());
+        Browser.setHtml("eventLog", "");
+        Browser.setHtml("resultBar",
+            "<span class=\"pill err\">FAIL</span><span>" + escape(outcome.summary()) + "</span>");
+        Browser.setHtmlAttribute("simStatusDot", "style", "background: var(--err)");
+    }
+
+    private static void renderKitchen(SimulationResult snap, Level level) {
+        List<Simulator.ChefSnapshot> chefs = activeSimulator != null
+            ? activeSimulator.chefSnapshots()
+            : List.of();
+        Map<String, Integer> globals = snap.finalGlobals();
+
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < chefs.size(); i++) {
+            Simulator.ChefSnapshot c = chefs.get(i);
+            sb.append(renderChefCard(c, i));
+            if (i == (chefs.size() - 1) / 2) {
+                sb.append(renderCounterStage(globals, level, chefs));
+            }
+        }
+        if (chefs.isEmpty()) {
+            sb.append(emptyKitchenHtml(level));
+        }
+        Browser.setHtml("kitchenView", sb.toString());
+    }
+
+    private static String renderChefCard(Simulator.ChefSnapshot c, int displayIndex) {
+        String classKey = "c" + (displayIndex % 3 + 1);
+        String classes = "chef-card " + classKey;
+        if (c.done()) classes += " done";
+        else if (c.blockedOnLock() != null) classes += " blocked";
+        else if (c.lastEventDetail() != null) classes += " active";
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("<div class=\"").append(classes).append("\">");
+        sb.append("<div class=\"chef-card-head\"><span class=\"chef-dot\"></span>");
+        sb.append("<span>").append(escape(c.name())).append("</span>");
+        if (c.blockedOnLock() != null) {
+            sb.append("<span class=\"chef-lock-tag\">⏳ waiting on ").append(escape(c.blockedOnLock())).append("</span>");
+        }
+        sb.append("</div>");
+
+        sb.append("<div class=\"chef-status\"><span class=\"status-label\">status</span>");
+        sb.append("<span class=\"status-val\">").append(escape(statusLabel(c))).append("</span></div>");
+
+        String localsLine = primaryLocalString(c.locals());
+        sb.append("<div class=\"chef-status\"><span class=\"status-label\">locals</span>");
+        sb.append("<span class=\"status-val mono\">").append(escape(localsLine)).append("</span></div>");
+
+        sb.append("<div class=\"chef-action\">");
+        sb.append(escape(c.lastEventDetail() != null ? c.lastEventDetail() : "waiting"));
+        sb.append("</div>");
+
+        boolean disabled = c.done()
+            || activeSimulator == null
+            || activeSimulator.isFinished();
+        sb.append("<button class=\"chef-step-btn\" data-chef-index=\"").append(c.index()).append("\"")
+            .append(disabled ? " disabled" : "").append(">→ Step ")
+            .append(escape(c.name())).append("</button>");
+        sb.append("</div>");
+        return sb.toString();
+    }
+
+    private static String renderCounterStage(Map<String, Integer> globals, Level level,
+                                             List<Simulator.ChefSnapshot> chefs) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("<div class=\"counter-stage\">");
+
+        Map.Entry<String, SharedType> primary = primaryDataDeclaration(level);
+        if (primary != null) {
+            String name = primary.getKey();
+            int value = globals.getOrDefault(name, 0);
+            sb.append("<div class=\"counter-label\">")
+                .append(escape(primary.getValue().javaTypeName())).append(' ')
+                .append(escape(name)).append("</div>");
+            sb.append("<div class=\"counter-display\">").append(value).append("</div>");
+            sb.append("<div class=\"counter-target\">target = ")
+                .append(escape(level.passingCondition())).append("</div>");
+        } else {
+            sb.append("<div class=\"counter-label\">shared resources</div>");
+        }
+
+        // Other globals (locks, additional data)
+        StringBuilder mini = new StringBuilder();
+        for (var entry : level.sharedDeclarations().entrySet()) {
+            String name = entry.getKey();
+            if (primary != null && primary.getKey().equals(name)) continue;
+            SharedType type = entry.getValue();
+            if (type instanceof SharedType.MonitorType || type instanceof SharedType.LockType) {
+                mini.append("<div class=\"global-mini\">")
+                    .append(escape(type.javaTypeName())).append(" <b>")
+                    .append(escape(name)).append("</b></div>");
+            } else {
+                int v = globals.getOrDefault(name, 0);
+                mini.append("<div class=\"global-mini\">")
+                    .append(escape(type.javaTypeName())).append(" <b>")
+                    .append(escape(name)).append("</b> = ").append(v).append("</div>");
+            }
+        }
+        sb.append(mini);
+        sb.append("</div>");
+        return sb.toString();
+    }
+
+    private static String emptyKitchenHtml(Level level) {
+        StringBuilder sb = new StringBuilder();
+        sb.append(emptyChefCardHtml("c1"));
+        sb.append(renderCounterStage(initialGlobalsForDisplay(level), level, List.of()));
+        sb.append(emptyChefCardHtml("c2"));
+        return sb.toString();
+    }
+
+    private static String emptyChefCardHtml(String colorClass) {
+        return "<div class=\"chef-card " + colorClass + "\">"
+            + "<div class=\"chef-card-head\"><span class=\"chef-dot\"></span><span>chef</span></div>"
+            + "<div class=\"chef-status\"><span class=\"status-label\">status</span><span class=\"status-val\">idle</span></div>"
+            + "<div class=\"chef-action\">Press Run to start the kitchen.</div>"
+            + "</div>";
+    }
+
+    private static Map<String, Integer> initialGlobalsForDisplay(Level level) {
+        return level.initialGlobals();
     }
 
     private static void renderEventLog(SimulationResult sim) {
         if (sim.events().isEmpty()) {
-            Browser.setHtml("eventLog", "<p>No events yet.</p>");
+            Browser.setHtml("eventLog", "<li class=\"empty-log\">Run the code to see the kitchen log.</li>");
             return;
         }
-        StringBuilder log = new StringBuilder("<ol>");
-        for (String event : sim.events()) {
-            log.append("<li>").append(escape(event)).append("</li>");
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < sim.events().size(); i++) {
+            sb.append("<li class=\"ev\">");
+            sb.append("<span class=\"ev-num\">").append(pad2(i + 1)).append("</span>");
+            sb.append("<span class=\"ev-text\">").append(escape(sim.events().get(i))).append("</span>");
+            sb.append("</li>");
         }
-        log.append("</ol>");
-        Browser.setHtml("eventLog", log.toString());
+        Browser.setHtml("eventLog", sb.toString());
     }
 
-    private static void renderErrors(Outcome outcome) {
-        StringBuilder html = new StringBuilder("<p><strong>Could not run your code:</strong></p><ul>");
-        for (String err : outcome.errors()) {
-            html.append("<li>").append(escape(err)).append("</li>");
+    private static void renderResultBar(Outcome outcome, SimulationResult sim, boolean done) {
+        StringBuilder sb = new StringBuilder();
+        if (outcome.passed()) {
+            sb.append("<span class=\"pill ok\">PASS</span>");
+            sb.append("<span><b>").append(escape(outcome.summary())).append("</b></span>");
+            Browser.setClassName("resultBar", "result-bar pass");
+        } else {
+            sb.append("<span class=\"pill err\">FAIL</span>");
+            sb.append("<span>").append(escape(outcome.summary())).append("</span>");
+            Browser.setClassName("resultBar", "result-bar fail");
         }
-        html.append("</ul>");
-        Browser.setHtml("metrics", html.toString());
-        Browser.setHtml("eventLog", "<p>No events. Fix the error above and try again.</p>");
-        Browser.setClassName("statusBanner", "status-banner status-fail");
-        Browser.setText("statusBanner", outcome.summary());
+        Browser.setHtml("resultBar", sb.toString());
     }
 
-    private static void downloadJava() {
-        Level level = REGISTRY.get(currentIndex);
-        String code = Browser.getEditorCode();
-        Browser.downloadFile(level.lessonClassName() + ".java", level.fullSourceWith(code));
+    private static String idleResultHtml() {
+        Browser.setClassName("resultBar", "result-bar");
+        return "<span class=\"pill muted\">idle</span><span>Run the code to begin.</span>";
     }
 
-    private static void toggleFullSource() {
-        fullSourceVisible = !fullSourceVisible;
-        renderFullSource();
+    private static void renderStepCounter(SimulationResult sim) {
+        int current = sim.events().size();
+        int total = Math.max(totalTraceSteps, current);
+        Browser.setText("stepCounter", "step " + current + " / " + total);
     }
 
-    private static void renderFullSource() {
-        if (!fullSourceVisible) {
-            Browser.setText("showSourceBtn", "Show full Java source");
-            Browser.setClassName("fullSourcePanel", "panel hidden");
-            Browser.setText("fullSource", "");
-            return;
-        }
-        Browser.setText("showSourceBtn", "Hide full Java source");
-        Browser.setClassName("fullSourcePanel", "panel");
-        Level level = REGISTRY.get(currentIndex);
-        String code = Browser.getEditorCode();
-        Browser.setText("fullSource", level.fullSourceWith(code));
+    private static String stepLabel(SimulationResult sim) {
+        return "step " + sim.events().size() + " of " + Math.max(totalTraceSteps, sim.events().size());
+    }
+
+    private static String currentCounterText(SimulationResult sim, Level level) {
+        Map.Entry<String, SharedType> primary = primaryDataDeclaration(level);
+        if (primary == null) return "—";
+        return String.valueOf(sim.finalGlobals().getOrDefault(primary.getKey(), 0));
     }
 
     private static void renderBreadcrumb() {
@@ -450,7 +612,7 @@ public final class Main {
                 .append(" data-level-index=\"").append(i).append("\"")
                 .append(accessible ? "" : " disabled")
                 .append(">");
-            sb.append("<span class=\"level-num\">").append(i + 1).append("</span>");
+            sb.append("<span class=\"level-num\">").append(pad2(i + 1)).append("</span>");
             sb.append("<span class=\"level-name\">").append(escape(stripPrefix(l.title()))).append("</span>");
             if (done) {
                 sb.append("<span class=\"level-mark\">✓</span>");
@@ -469,32 +631,202 @@ public final class Main {
         Browser.setDisabled("nextBtn", !canGoNext);
     }
 
+    private static void renderFooterNote(boolean passed) {
+        Browser.setText("footerNote", passed
+            ? "Solved. The bug is dead, long live the bug."
+            : "Stuck? Open the hint panel above.");
+    }
+
+    private static void setObjectiveState(boolean attempted, boolean passed) {
+        StringBuilder sb = new StringBuilder();
+        if (!attempted) {
+            sb.append("<span class=\"pill muted\">untested</span><span>Run the code to see the bug.</span>");
+        } else if (passed) {
+            sb.append("<span class=\"pill ok\">PASS</span><span>Both increments stuck. Nicely done.</span>");
+        } else {
+            sb.append("<span class=\"pill err\">FAIL</span><span>The bug is still there. Fix it.</span>");
+        }
+        Browser.setHtml("objectiveState", sb.toString());
+        Browser.setClassName("objectiveStepRun", "oc-dot" + (attempted ? " on" : ""));
+        Browser.setClassName("objectiveStepPass", "oc-dot" + (passed ? " on" : ""));
+    }
+
+    private static String introWithHighlights(String intro) {
+        // Wrap numeric literals and keywords in <code> for visual rhythm
+        String escaped = escape(intro.trim());
+        // Wrap standalone integers
+        escaped = escaped.replaceAll("\\b(\\d{2,})\\b", "<code>$1</code>");
+        return escaped.replace("\n", "<br>");
+    }
+
+    private static void renderHintCard() {
+        Level level = REGISTRY.get(currentIndex);
+        List<String> hints = level.hints();
+        Browser.setText("hintMeta", hintsRevealed + " / " + hints.size() + " revealed");
+
+        if (hintsRevealed == 0) {
+            Browser.setHtml("hintBody",
+                "<p class=\"hint-empty\">Run a couple of times — hints unlock after two failed attempts.</p>");
+            return;
+        }
+        StringBuilder sb = new StringBuilder("<ol class=\"hint-list\">");
+        for (int i = 0; i < hintsRevealed; i++) {
+            sb.append("<li>").append(escape(hints.get(i))).append("</li>");
+        }
+        sb.append("</ol>");
+        Browser.setHtml("hintBody", sb.toString());
+    }
+
+    private static void maybeRevealHint() {
+        Level level = REGISTRY.get(currentIndex);
+        List<String> hints = level.hints();
+        if (failsSinceLastPass < HINT_AFTER_FAILS) {
+            renderHintCard();
+            return;
+        }
+        if (hintsRevealed >= hints.size()) {
+            renderHintCard();
+            return;
+        }
+        hintsRevealed++;
+        Browser.setHtmlAttribute("hintCard", "open", "");
+        renderHintCard();
+    }
+
+    private static void toggleFullSource() {
+        fullSourceVisible = !fullSourceVisible;
+        renderFullSource();
+    }
+
+    private static void renderFullSource() {
+        if (!fullSourceVisible) {
+            Browser.setText("showSourceBtn", "Show full source");
+            Browser.setClassName("fullSourcePanel", "full-source-panel hidden");
+            Browser.setText("fullSource", "");
+            return;
+        }
+        Browser.setText("showSourceBtn", "Hide full source");
+        Browser.setClassName("fullSourcePanel", "full-source-panel");
+        Level level = REGISTRY.get(currentIndex);
+        String code = Browser.getEditorCode();
+        Browser.setText("fullSource", level.fullSourceWith(code));
+    }
+
+    private static void downloadJava() {
+        Level level = REGISTRY.get(currentIndex);
+        String code = Browser.getEditorCode();
+        Browser.downloadFile(level.lessonClassName() + ".java", level.fullSourceWith(code));
+    }
+
+    private static void renderSchedulePanel() {
+        // Schedule controls were merged into chef cards (each card has a Step button)
+        // Chef step buttons are rendered as part of the kitchen view.
+    }
+
+    private static void switchTab(int unused) {
+        // unused; we handle tabs via setTab
+    }
+
+    private static void setTab(String tab) {
+        activeTab = tab;
+        boolean viz = tab.equals("viz");
+        Browser.setClassName("tabViz", viz ? "tab on" : "tab");
+        Browser.setClassName("tabLog", viz ? "tab" : "tab on");
+        Browser.setHtmlAttribute("kitchenView", "style", viz ? "" : "display:none");
+        Browser.setHtmlAttribute("eventLog", "style", viz ? "display:none" : "");
+    }
+
+    private static void showSuccessOverlay(Level level) {
+        Browser.setText("overlayEyebrow",
+            "Level " + pad2(currentIndex + 1) + " complete · " + stripPrefix(level.title()));
+        Browser.setText("overlayTitle", successTitleFor(level));
+        Browser.setText("overlayBody", successBodyFor(level));
+        Browser.setText("overlayNextBtn",
+            currentIndex < REGISTRY.size() - 1 ? "Next level →" : "Replay");
+        Browser.setClassName("successOverlay", "overlay");
+    }
+
+    private static String successTitleFor(Level level) {
+        return switch (level.id()) {
+            case "lost-update" -> "You sealed the race.";
+            case "atomic-counter" -> "Lock-free, and it works.";
+            case "deadlock-kitchen" -> "Both chefs serve.";
+            default -> "Level complete.";
+        };
+    }
+
+    private static String successBodyFor(Level level) {
+        return switch (level.id()) {
+            case "lost-update" -> "Synchronizing the read+write makes it atomic — no other chef can sneak between the read and the write.";
+            case "atomic-counter" -> "AtomicInteger.incrementAndGet does the read+add+write as a single CAS — no lock, no contention.";
+            case "deadlock-kitchen" -> "Consistent lock ordering breaks the cycle. Every chef now grabs the oven first, then the fryer.";
+            default -> "Bug squashed. On to the next.";
+        };
+    }
+
+    private static String statusLabel(Simulator.ChefSnapshot c) {
+        if (c.done()) return "done";
+        if (c.blockedOnLock() != null) return "blocked";
+        if (c.lastEventDetail() == null) return "idle";
+        String e = c.lastEventDetail();
+        if (e.startsWith("reads")) return "reading";
+        if (e.startsWith("writes")) return "writing";
+        if (e.startsWith("acquires")) return "locking";
+        if (e.startsWith("releases")) return "unlocking";
+        if (e.startsWith("atomically increments")) return "incrementing";
+        if (e.startsWith("atomically adds")) return "adding";
+        if (e.startsWith("CAS")) return "CAS";
+        if (e.startsWith("sets")) return "computing";
+        if (e.startsWith("logs:")) return "logging";
+        return "running";
+    }
+
+    private static String primaryLocalString(Map<String, Integer> locals) {
+        if (locals == null || locals.isEmpty()) return "—";
+        StringBuilder sb = new StringBuilder();
+        boolean first = true;
+        for (var entry : locals.entrySet()) {
+            String name = entry.getKey();
+            if (name.startsWith("_t")) continue;
+            if (!first) sb.append("  ");
+            sb.append(name).append("=").append(entry.getValue());
+            first = false;
+        }
+        if (sb.length() == 0) return "—";
+        return sb.toString();
+    }
+
+    private static Map.Entry<String, SharedType> primaryDataDeclaration(Level level) {
+        for (var e : level.sharedDeclarations().entrySet()) {
+            if (e.getValue() instanceof SharedType.IntType
+                || e.getValue() instanceof SharedType.AtomicIntegerType) {
+                return e;
+            }
+        }
+        return null;
+    }
+
+    private static String primaryTypeLabel(Level level) {
+        var p = primaryDataDeclaration(level);
+        if (p != null) return p.getValue().javaTypeName();
+        // No int data → use first shared name's type
+        for (var e : level.sharedDeclarations().entrySet()) {
+            return e.getValue().javaTypeName();
+        }
+        return "void";
+    }
+
     private static String stripPrefix(String title) {
         int colon = title.indexOf(':');
         return colon >= 0 ? title.substring(colon + 1).trim() : title;
     }
 
-    private static void maybeRevealHint(Level level) {
-        List<String> hints = level.hints();
-        if (failsSinceLastPass < HINT_AFTER_FAILS) {
-            return;
-        }
-        if (hintsRevealed >= hints.size()) {
-            return;
-        }
-        hintsRevealed++;
-
-        StringBuilder html = new StringBuilder();
-        html.append("<h3>Hints (").append(hintsRevealed).append("/").append(hints.size()).append(")</h3>");
-        html.append("<ul>");
-        for (int i = 0; i < hintsRevealed; i++) {
-            html.append("<li>").append(escape(hints.get(i))).append("</li>");
-        }
-        html.append("</ul>");
-        Browser.setHtml("hintPanel", html.toString());
+    private static String pad2(int n) {
+        return n < 10 ? "0" + n : String.valueOf(n);
     }
 
     private static String escape(String text) {
+        if (text == null) return "";
         return text
             .replace("&", "&amp;")
             .replace("<", "&lt;")

@@ -37,7 +37,8 @@ public final class Simulator {
         return finished;
     }
 
-    public record ChefSnapshot(int index, String name, boolean done, String blockedOnLock) {
+    public record ChefSnapshot(int index, String name, boolean done, String blockedOnLock,
+                               String lastEventDetail, Map<String, Integer> locals) {
     }
 
     public List<ChefSnapshot> chefSnapshots() {
@@ -54,7 +55,8 @@ public final class Simulator {
                     }
                 }
             }
-            result.add(new ChefSnapshot(i, chef.name(), chef.done(), blocked));
+            result.add(new ChefSnapshot(i, chef.name(), chef.done(), blocked,
+                chef.lastEventDetail, Map.copyOf(chef.locals)));
         }
         return result;
     }
@@ -184,7 +186,7 @@ public final class Simulator {
             }
             lockOwner.put(l.lockName(), chef.name());
             chef.recordHeld(l.lockName());
-            log(chef.name() + " acquires lock '" + l.lockName() + "'");
+            recordEvent(chef, "acquires lock '" + l.lockName() + "'");
             chef.advance();
             return true;
         }
@@ -196,7 +198,7 @@ public final class Simulator {
                 );
             }
             lockOwner.remove(u.lockName());
-            log(chef.name() + " releases lock '" + u.lockName() + "'");
+            recordEvent(chef, "releases lock '" + u.lockName() + "'");
             chef.advance();
             return true;
         }
@@ -204,7 +206,7 @@ public final class Simulator {
         if (next instanceof Instruction.Read r) {
             int value = globals.getOrDefault(r.globalName(), 0);
             chef.setLocal(r.localName(), value);
-            log(chef.name() + " reads " + r.globalName() + " = " + value);
+            recordEvent(chef, "reads " + r.globalName() + " = " + value);
             chef.advance();
             return true;
         }
@@ -212,7 +214,7 @@ public final class Simulator {
         if (next instanceof Instruction.Write w) {
             int value = evaluate(chef, w.value());
             globals.put(w.globalName(), value);
-            log(chef.name() + " writes " + w.globalName() + " = " + value);
+            recordEvent(chef, "writes " + w.globalName() + " = " + value);
             chef.advance();
             return true;
         }
@@ -220,7 +222,7 @@ public final class Simulator {
         if (next instanceof Instruction.AtomicInc a) {
             int value = globals.getOrDefault(a.globalName(), 0) + 1;
             globals.put(a.globalName(), value);
-            log(chef.name() + " atomically increments " + a.globalName() + " to " + value);
+            recordEvent(chef, "atomically increments " + a.globalName() + " to " + value);
             chef.advance();
             return true;
         }
@@ -229,7 +231,7 @@ public final class Simulator {
             int delta = evaluate(chef, a.delta());
             int value = globals.getOrDefault(a.globalName(), 0) + delta;
             globals.put(a.globalName(), value);
-            log(chef.name() + " atomically adds " + delta + " to " + a.globalName() + " (now " + value + ")");
+            recordEvent(chef, "atomically adds " + delta + " to " + a.globalName() + " (now " + value + ")");
             chef.advance();
             return true;
         }
@@ -240,15 +242,16 @@ public final class Simulator {
             if (current == expected) {
                 int newVal = evaluate(chef, c.newValue());
                 globals.put(c.globalName(), newVal);
-                log(chef.name() + " CAS " + c.globalName() + ": " + expected + " → " + newVal + " (success)");
+                recordEvent(chef, "CAS " + c.globalName() + ": " + expected + " → " + newVal + " (success)");
             } else {
-                log(chef.name() + " CAS " + c.globalName() + ": expected " + expected + ", saw " + current + " (failure)");
+                recordEvent(chef, "CAS " + c.globalName() + ": expected " + expected + ", saw " + current + " (failure)");
             }
             chef.advance();
             return true;
         }
 
         if (next instanceof Instruction.Log lg) {
+            chef.lastEventDetail = "logs: " + lg.message();
             log(chef.name() + ": " + lg.message());
             chef.advance();
             return true;
@@ -257,12 +260,17 @@ public final class Simulator {
         if (next instanceof Instruction.LocalSet ls) {
             int value = evaluate(chef, ls.value());
             chef.setLocal(ls.localName(), value);
-            log(chef.name() + " sets " + ls.localName() + " = " + value);
+            recordEvent(chef, "sets " + ls.localName() + " = " + value);
             chef.advance();
             return true;
         }
 
         throw new SimulationException("Unknown instruction: " + next);
+    }
+
+    private void recordEvent(ChefState chef, String detail) {
+        chef.lastEventDetail = detail;
+        log(chef.name() + " " + detail);
     }
 
     private int evaluate(ChefState chef, Expression expr) {
@@ -327,6 +335,7 @@ public final class Simulator {
         private final Map<String, Integer> locals = new HashMap<>();
         private final Set<String> heldLocks = new HashSet<>();
         private int pc;
+        private String lastEventDetail;
 
         ChefState(ChefProgram program) {
             this.program = program;

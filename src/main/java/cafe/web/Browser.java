@@ -55,6 +55,18 @@ public final class Browser {
     public static native void setClassName(String id, String className);
 
     @JSBody(
+        params = { "id", "attr", "value" },
+        script = "var el = document.getElementById(id); if (el) el.setAttribute(attr, value);"
+    )
+    public static native void setHtmlAttribute(String id, String attr, String value);
+
+    @JSBody(
+        params = { "selector", "attr", "value" },
+        script = "var el = document.querySelector(selector); if (el) el.setAttribute(attr, value);"
+    )
+    public static native void setDataAttribute(String selector, String attr, String value);
+
+    @JSBody(
         params = { "id", "disabled" },
         script = "document.getElementById(id).disabled = disabled;"
     )

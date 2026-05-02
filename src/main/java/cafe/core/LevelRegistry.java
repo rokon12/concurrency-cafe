@@ -2,9 +2,7 @@ package cafe.core;
 
 import java.util.List;
 
-public final class LevelRegistry {
-
-    private final List<Level> levels;
+public record LevelRegistry(List<Level> levels) {
 
     public LevelRegistry(List<Level> levels) {
         if (levels.isEmpty()) {
@@ -15,14 +13,10 @@ public final class LevelRegistry {
 
     public static LevelRegistry defaultRegistry() {
         return new LevelRegistry(List.of(
-            new LostUpdateLevel(),
-            new AtomicCounterLevel(),
-            new DeadlockKitchenLevel()
+                new LostUpdateLevel(),
+                new AtomicCounterLevel(),
+                new DeadlockKitchenLevel()
         ));
-    }
-
-    public List<Level> levels() {
-        return levels;
     }
 
     public int size() {

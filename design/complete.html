@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Level Complete — Concurrency Café</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Fraunces:opsz,wght@9..144,400;9..144,600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="styles.css" />
+<style>
+  .complete-page {
+    max-width: 880px;
+    margin: 0 auto;
+    padding: 64px 32px 80px;
+  }
+  .complete-eyebrow {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--ok);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .complete-eyebrow::before {
+    content: '';
+    width: 24px;
+    height: 1px;
+    background: var(--ok);
+  }
+  h1.complete-title {
+    font-family: 'Fraunces', serif;
+    font-weight: 400;
+    font-size: 56px;
+    letter-spacing: -0.025em;
+    margin: 0 0 20px;
+    text-wrap: balance;
+    line-height: 1.05;
+  }
+  h1.complete-title em { font-style: italic; color: var(--accent); }
+  .complete-lede {
+    font-size: 17px;
+    color: var(--fg-1);
+    max-width: 560px;
+    line-height: 1.6;
+    margin: 0 0 40px;
+  }
+  .summary-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 40px;
+  }
+  .summary-card {
+    background: var(--bg-1);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+  }
+  .summary-card h3 {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--fg-2);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin: 0 0 10px;
+    font-weight: 500;
+  }
+  .summary-card p {
+    margin: 0;
+    color: var(--fg-1);
+    font-size: 14px;
+    line-height: 1.55;
+  }
+  .summary-card code {
+    background: var(--bg-2);
+    padding: 1px 6px;
+    border-radius: 3px;
+    color: var(--accent);
+    font-size: 12px;
+  }
+  .next-row {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    margin-bottom: 56px;
+  }
+  .next-row .btn { padding: 11px 18px; font-size: 14px; }
+  .recap-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+  .recap-list li {
+    display: grid;
+    grid-template-columns: 24px 1fr;
+    gap: 12px;
+    padding: 8px 0;
+    font-size: 14px;
+    color: var(--fg-1);
+    border-bottom: 1px dashed var(--line);
+  }
+  .recap-list li:last-child { border-bottom: 0; }
+  .recap-list .check {
+    color: var(--ok);
+    font-family: var(--font-mono);
+  }
+
+  .upsell {
+    background: linear-gradient(135deg, var(--bg-1) 0%, var(--bg-2) 100%);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    padding: 32px;
+    display: grid;
+    grid-template-columns: 100px 1fr auto;
+    gap: 24px;
+    align-items: center;
+  }
+  .upsell-cover {
+    aspect-ratio: 3/4;
+    background: linear-gradient(160deg, #2a1f15, #1a130c);
+    border-radius: 4px;
+    display: grid;
+    place-items: center;
+    color: var(--accent);
+    font-family: var(--font-mono);
+    font-weight: 700;
+    box-shadow: 0 12px 24px rgba(0,0,0,0.4);
+  }
+  .upsell h3 {
+    font-family: 'Fraunces', serif;
+    font-weight: 400;
+    font-size: 22px;
+    margin: 0 0 4px;
+  }
+  .upsell p {
+    margin: 0;
+    color: var(--fg-1);
+    font-size: 13px;
+    line-height: 1.5;
+    max-width: 420px;
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script type="text/babel" src="topbar.jsx"></script>
+
+<script type="text/babel">
+function Complete() {
+  const [theme, setTheme] = React.useState('dark');
+  React.useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+  }, [theme]);
+  return (
+    <>
+      <TopBar active="levels" theme={theme} onThemeToggle={() => setTheme(t => t === 'dark' ? 'light' : 'dark')} />
+      <div className="complete-page">
+        <div className="complete-eyebrow">✓ Level 01 of 08 — Lost Update</div>
+        <h1 className="complete-title">The race is <em>sealed</em>.</h1>
+        <p className="complete-lede">
+          Wrapping the read-modify-write in a critical section made it atomic. No other thread could squeeze between the read and the write, so both increments stuck. Counter ended at 43.
+        </p>
+
+        <div className="summary-grid">
+          <div className="summary-card">
+            <h3>The bug</h3>
+            <p>Both threads read <code>counter = 41</code> before either had written. They each computed <code>42</code> and overwrote each other.</p>
+          </div>
+          <div className="summary-card">
+            <h3>The fix</h3>
+            <p>A <code>synchronized</code> block on a shared lock object forced one thread to wait until the other finished its read-modify-write.</p>
+          </div>
+          <div className="summary-card">
+            <h3>What you'll see again</h3>
+            <p>This pattern shows up everywhere: counters, caches, balance updates, anywhere two threads touch the same field.</p>
+          </div>
+          <div className="summary-card">
+            <h3>The trade-off</h3>
+            <p>Locks serialize. Next level: <code>AtomicInteger</code> achieves the same guarantee lock-free using compare-and-swap.</p>
+          </div>
+        </div>
+
+        <div className="next-row">
+          <a href="lesson.html" className="btn primary">Next: Atomic Counter →</a>
+          <a href="levels.html" className="btn">All levels</a>
+        </div>
+
+        <h2 style={{ fontFamily: 'Fraunces, serif', fontWeight: 400, fontSize: 28, letterSpacing: '-0.01em', marginBottom: 16 }}>What this level taught</h2>
+        <ul className="recap-list">
+          <li><span className="check">✓</span><span>A shared mutable variable is a hazard whenever two or more threads touch it.</span></li>
+          <li><span className="check">✓</span><span>Read-modify-write is three operations, not one. Anything can happen between them.</span></li>
+          <li><span className="check">✓</span><span>A critical section makes a sequence of operations appear atomic to other threads.</span></li>
+          <li><span className="check">✓</span><span><code style={{background: 'var(--bg-2)', padding: '1px 5px', borderRadius: 3, color: 'var(--accent)', fontFamily: 'var(--font-mono)', fontSize: 12}}>synchronized</code> uses an object's intrinsic monitor — every Java object has one.</span></li>
+        </ul>
+
+        <div style={{ height: 56 }} />
+
+        <a href="index.html#book" className="upsell" style={{ textDecoration: 'none', color: 'inherit' }}>
+          <div className="upsell-cover">cc</div>
+          <div>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--accent)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 6 }}>Go deeper</div>
+            <h3>Modern Concurrency in Java</h3>
+            <p>Chapter 3 of the book covers the Java Memory Model in depth — exactly why this race happens at the hardware level and what <code>happens-before</code> guarantees buy you.</p>
+          </div>
+          <span className="btn primary">Read Chapter 3 →</span>
+        </a>
+      </div>
+    </>
+  );
+}
+ReactDOM.createRoot(document.getElementById('root')).render(<Complete />);
+</script>
+</body>
+</html>

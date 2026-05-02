@@ -75,6 +75,11 @@ public final class LostUpdateLevel implements Level {
     }
 
     @Override
+    public String passingCondition() {
+        return "Counter ends at 43";
+    }
+
+    @Override
     public String fullSourceWith(String userCode) {
         StringBuilder sb = new StringBuilder();
         sb.append("public class LostUpdateLesson {\n");

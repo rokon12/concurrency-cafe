@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Concurrency Café — Learn Java concurrency by debugging a kitchen</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Fraunces:opsz,wght@9..144,400;9..144,600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="styles.css" />
+<style>
+  /* Landing-specific */
+  .hero {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 80px 32px 48px;
+    display: grid;
+    grid-template-columns: 1.05fr 1fr;
+    gap: 64px;
+    align-items: center;
+  }
+  .eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--fg-2);
+    margin-bottom: 24px;
+  }
+  .eyebrow::before {
+    content: '';
+    width: 24px;
+    height: 1px;
+    background: var(--accent);
+  }
+  h1.display {
+    font-family: 'Fraunces', serif;
+    font-weight: 400;
+    font-size: 64px;
+    line-height: 1.05;
+    letter-spacing: -0.025em;
+    margin: 0 0 24px;
+    text-wrap: balance;
+  }
+  h1.display em {
+    font-style: italic;
+    color: var(--accent);
+  }
+  .lede {
+    font-size: 18px;
+    color: var(--fg-1);
+    line-height: 1.55;
+    max-width: 480px;
+    margin: 0 0 32px;
+    text-wrap: pretty;
+  }
+  .cta-row {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+  }
+  .cta-row .btn { padding: 11px 18px; font-size: 14px; }
+  .cta-meta {
+    font-size: 12px;
+    color: var(--fg-2);
+    margin-left: 8px;
+  }
+
+  /* Demo terminal in hero */
+  .hero-demo {
+    background: var(--bg-1);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+    font-family: var(--font-mono);
+    font-size: 13px;
+  }
+  .hero-demo-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    background: var(--bg-2);
+    border-bottom: 1px solid var(--line);
+  }
+  .traffic { display: flex; gap: 6px; }
+  .traffic span {
+    width: 11px; height: 11px; border-radius: 50%;
+    background: var(--bg-3);
+  }
+  .hero-demo-title {
+    flex: 1;
+    text-align: center;
+    font-size: 11px;
+    color: var(--fg-2);
+    letter-spacing: 0.04em;
+  }
+  .hero-demo-body {
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    min-height: 380px;
+  }
+  .demo-code {
+    padding: 16px 14px;
+    line-height: 1.7;
+    border-bottom: 1px solid var(--line);
+  }
+  .chefs {
+    padding: 18px 14px;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 16px;
+    align-items: center;
+  }
+  .chef {
+    background: var(--bg-2);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 12px;
+    font-size: 12px;
+  }
+  .chef-name {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .chef.c1 .chef-name { color: var(--chef-1); }
+  .chef.c2 .chef-name { color: var(--chef-2); }
+  .chef-name::before {
+    content: '';
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: currentColor;
+  }
+  .chef-step { color: var(--fg-1); padding: 2px 0; }
+  .chef-step.read { color: var(--fg-0); }
+  .counter-cell {
+    text-align: center;
+    padding: 10px 16px;
+    background: var(--bg-0);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+  }
+  .counter-cell .label {
+    font-size: 10px;
+    color: var(--fg-2);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  .counter-cell .val {
+    font-size: 36px;
+    font-weight: 600;
+    color: var(--accent);
+    font-family: var(--font-mono);
+    line-height: 1;
+  }
+  .counter-cell .expected {
+    font-size: 11px;
+    color: var(--err);
+    margin-top: 6px;
+    font-family: var(--font-mono);
+  }
+  .demo-result {
+    padding: 12px 14px;
+    background: var(--bg-2);
+    border-top: 1px solid var(--line);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 12px;
+  }
+
+  /* Sections */
+  section.section {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 64px 32px;
+  }
+  .section-eyebrow {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+  h2.h2 {
+    font-family: 'Fraunces', serif;
+    font-weight: 400;
+    font-size: 40px;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+    margin: 0 0 16px;
+    text-wrap: balance;
+  }
+  h2.h2 em { font-style: italic; color: var(--accent); }
+  .section-lede {
+    font-size: 16px;
+    color: var(--fg-1);
+    max-width: 560px;
+    margin: 0 0 40px;
+    text-wrap: pretty;
+  }
+
+  /* Levels grid */
+  .levels-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+  }
+  .level-card {
+    background: var(--bg-1);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    padding: 24px;
+    text-decoration: none;
+    color: inherit;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    transition: border-color 0.15s, transform 0.15s;
+  }
+  .level-card:hover {
+    border-color: var(--accent);
+    transform: translateY(-2px);
+  }
+  .level-num {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--fg-2);
+    letter-spacing: 0.08em;
+  }
+  .level-title {
+    font-family: 'Fraunces', serif;
+    font-weight: 400;
+    font-size: 24px;
+    letter-spacing: -0.01em;
+    margin: 0;
+  }
+  .level-desc { color: var(--fg-1); font-size: 13px; line-height: 1.5; flex: 1; }
+  .level-meta {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--fg-2);
+  }
+
+  /* Concept pills */
+  .concept-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+  }
+  .concept-tile {
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 16px;
+    background: var(--bg-1);
+  }
+  .concept-tile .name {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--accent);
+    margin-bottom: 6px;
+  }
+  .concept-tile .desc { font-size: 12px; color: var(--fg-1); line-height: 1.5; }
+
+  /* Book strip */
+  .book {
+    margin: 0 auto;
+    max-width: 1200px;
+    padding: 0 32px 80px;
+  }
+  .book-card {
+    display: grid;
+    grid-template-columns: 220px 1fr auto;
+    gap: 32px;
+    align-items: center;
+    background: linear-gradient(135deg, var(--bg-1) 0%, var(--bg-2) 100%);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    padding: 32px;
+    position: relative;
+    overflow: hidden;
+  }
+  .book-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at 80% 50%, color-mix(in oklab, var(--accent) 12%, transparent), transparent 50%);
+    pointer-events: none;
+  }
+  .book-cover {
+    aspect-ratio: 3 / 4;
+    background: linear-gradient(160deg, #2a1f15 0%, #1a130c 100%);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 24px 18px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    position: relative;
+    box-shadow: 0 12px 32px rgba(0,0,0,0.4), -4px 0 12px rgba(0,0,0,0.2);
+  }
+  .book-cover .book-eyebrow {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: var(--accent);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+  }
+  .book-cover .book-title {
+    font-family: 'Fraunces', serif;
+    color: #f4ede0;
+    font-size: 22px;
+    line-height: 1.1;
+    letter-spacing: -0.01em;
+  }
+  .book-cover .book-author {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: #8a8170;
+    letter-spacing: 0.08em;
+  }
+  .book-cover .book-mark {
+    position: absolute;
+    top: 18px;
+    right: 18px;
+    width: 22px; height: 22px;
+    background: var(--accent);
+    border-radius: 3px;
+    display: grid; place-items: center;
+    color: #1a130c;
+    font-family: var(--font-mono);
+    font-weight: 700;
+    font-size: 11px;
+  }
+  .book-info { position: relative; z-index: 1; }
+  .book-info h3 {
+    font-family: 'Fraunces', serif;
+    font-weight: 400;
+    font-size: 28px;
+    margin: 0 0 8px;
+    letter-spacing: -0.01em;
+  }
+  .book-info p { color: var(--fg-1); font-size: 14px; max-width: 460px; margin: 0 0 14px; line-height: 1.55; }
+  .book-info .by { font-size: 12px; color: var(--fg-2); font-family: var(--font-mono); }
+  .book-cta { position: relative; z-index: 1; display: flex; flex-direction: column; gap: 8px; align-items: flex-end; }
+  .book-cta .price { font-family: var(--font-mono); font-size: 12px; color: var(--fg-2); }
+
+  footer {
+    border-top: 1px solid var(--line);
+    padding: 32px;
+    text-align: center;
+    font-size: 12px;
+    color: var(--fg-2);
+    font-family: var(--font-mono);
+  }
+
+  @media (max-width: 900px) {
+    .hero { grid-template-columns: 1fr; padding-top: 48px; }
+    h1.display { font-size: 44px; }
+    .levels-grid, .concept-grid { grid-template-columns: 1fr; }
+    .book-card { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="topbar.jsx"></script>
+<script type="text/babel" src="code-block.jsx"></script>
+
+<script type="text/babel">
+function App() {
+  const [theme, setTheme] = React.useState('dark');
+  React.useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+  }, [theme]);
+
+  return (
+    <>
+      <TopBar active="home" theme={theme} onThemeToggle={() => setTheme(t => t === 'dark' ? 'light' : 'dark')} />
+
+      <section className="hero">
+        <div>
+          <div className="eyebrow">Hands-on Java concurrency</div>
+          <h1 className="display">
+            Two chefs, one counter,<br />
+            and a <em>silent bug</em>.
+          </h1>
+          <p className="lede">
+            Concurrency Café teaches Java threads, locks, and atomics through a kitchen that's quietly losing orders. Spot the race, fix the code, watch it pass — then move to the next level.
+          </p>
+          <div className="cta-row">
+            <a href="lesson.html" className="btn primary">
+              Start Level 1 &nbsp;→
+            </a>
+            <a href="levels.html" className="btn">All levels</a>
+            <span className="cta-meta">8 levels · ~3 hrs · free</span>
+          </div>
+        </div>
+
+        <HeroDemo />
+      </section>
+
+      <section className="section" style={{ paddingTop: 24 }}>
+        <div className="section-eyebrow">/* the curriculum */</div>
+        <h2 className="h2">Eight bugs. Eight <em>aha</em> moments.</h2>
+        <p className="section-lede">
+          Each level is a small, broken kitchen. Read the code, run the simulation, watch the threads collide, then patch the bug with the right primitive.
+        </p>
+
+        <div className="levels-grid">
+          <a className="level-card" href="lesson.html">
+            <div className="level-num">01 / 08</div>
+            <h3 className="level-title">Lost Update</h3>
+            <p className="level-desc">Two chefs increment the same counter. The total comes up short. Why?</p>
+            <div className="level-meta">
+              <span className="pill accent">Beginner</span>
+              <span>·</span>
+              <span>read-modify-write</span>
+            </div>
+          </a>
+          <a className="level-card" href="levels.html">
+            <div className="level-num">02 / 08</div>
+            <h3 className="level-title">Atomic Counter</h3>
+            <p className="level-desc">Replace the broken increment with a primitive that promises atomicity.</p>
+            <div className="level-meta">
+              <span className="pill accent">Beginner</span>
+              <span>·</span>
+              <span>AtomicInteger</span>
+            </div>
+          </a>
+          <a className="level-card" href="levels.html">
+            <div className="level-num">03 / 08</div>
+            <h3 className="level-title">Deadlock Kitchen</h3>
+            <p className="level-desc">Two chefs each hold a tool the other needs. Nobody serves. Untangle the lock order.</p>
+            <div className="level-meta">
+              <span className="pill accent">Intermediate</span>
+              <span>·</span>
+              <span>ReentrantLock</span>
+            </div>
+          </a>
+        </div>
+      </section>
+
+      <section className="section">
+        <div className="section-eyebrow">/* what you'll learn */</div>
+        <h2 className="h2">Every concept, paired with a <em>visible failure</em>.</h2>
+        <div className="concept-grid">
+          <div className="concept-tile">
+            <div className="name">synchronized</div>
+            <div className="desc">Why a single keyword can fix — and slow — your kitchen.</div>
+          </div>
+          <div className="concept-tile">
+            <div className="name">volatile</div>
+            <div className="desc">Visibility, the JMM, and why one thread can't see another's writes.</div>
+          </div>
+          <div className="concept-tile">
+            <div className="name">AtomicInteger</div>
+            <div className="desc">Lock-free counters, CAS, and the cost of contention.</div>
+          </div>
+          <div className="concept-tile">
+            <div className="name">ReentrantLock</div>
+            <div className="desc">Explicit locks, fairness, and why try-finally matters.</div>
+          </div>
+          <div className="concept-tile">
+            <div className="name">Virtual threads</div>
+            <div className="desc">Java 21+ green threads, when to use them, when not to.</div>
+          </div>
+          <div className="concept-tile">
+            <div className="name">Deadlock</div>
+            <div className="desc">Lock-ordering, livelock, and how to recover.</div>
+          </div>
+          <div className="concept-tile">
+            <div className="name">Memory barriers</div>
+            <div className="desc">Happens-before and what the compiler is allowed to do.</div>
+          </div>
+          <div className="concept-tile">
+            <div className="name">Structured concurrency</div>
+            <div className="desc">Tasks, scopes, and JEP 453 in practical terms.</div>
+          </div>
+        </div>
+      </section>
+
+      <div className="book" id="book">
+        <div className="book-card">
+          <div className="book-cover">
+            <div>
+              <div className="book-eyebrow">O'Brien Press · 2025</div>
+            </div>
+            <div>
+              <div className="book-title">Modern Concurrency in Java</div>
+              <div style={{ height: 12 }} />
+              <div className="book-author">A. Burke</div>
+            </div>
+            <div className="book-mark">cc</div>
+          </div>
+          <div className="book-info">
+            <div className="section-eyebrow" style={{ marginBottom: 8 }}>/* the companion book */</div>
+            <h3>Go deeper than the levels.</h3>
+            <p>
+              The Café gives you the intuition. The book gives you the JMM, virtual threads, structured concurrency, and the patterns you'll actually ship. 320 pages, no fluff.
+            </p>
+            <div className="by">Written by the author of Concurrency Café.</div>
+          </div>
+          <div className="book-cta">
+            <a href="#" className="btn primary">Get the book&nbsp;→</a>
+            <span className="price">$34 · PDF + EPUB</span>
+          </div>
+        </div>
+      </div>
+
+      <footer>
+        Concurrency Café · built for developers learning Java threads · v0.4
+      </footer>
+    </>
+  );
+}
+
+function HeroDemo() {
+  const code = `Thread chef1 = Thread.ofVirtual().start(() -> {
+  int x = counter;
+  counter = x + 1;
+});
+
+Thread chef2 = Thread.ofVirtual().start(() -> {
+  int x = counter;
+  counter = x + 1;
+});`;
+  return (
+    <div className="hero-demo">
+      <div className="hero-demo-head">
+        <div className="traffic"><span /><span /><span /></div>
+        <div className="hero-demo-title">Level 01 — lost-update.java</div>
+        <div style={{ width: 44 }} />
+      </div>
+      <div className="hero-demo-body">
+        <div className="demo-code">
+          <CodeBlock src={code} />
+        </div>
+        <div className="chefs">
+          <div className="chef c1">
+            <div className="chef-name">chef1</div>
+            <div className="chef-step">reads counter → 41</div>
+            <div className="chef-step read">writes counter ← 42</div>
+          </div>
+          <div className="counter-cell">
+            <div className="label">counter</div>
+            <div className="val">42</div>
+            <div className="expected">expected 43</div>
+          </div>
+          <div className="chef c2">
+            <div className="chef-name">chef2</div>
+            <div className="chef-step">reads counter → 41</div>
+            <div className="chef-step read">writes counter ← 42</div>
+          </div>
+        </div>
+        <div className="demo-result">
+          <span className="pill err">FAIL</span>
+          <span style={{ color: 'var(--fg-1)' }}>1 update lost. Both chefs read 41 before either wrote.</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

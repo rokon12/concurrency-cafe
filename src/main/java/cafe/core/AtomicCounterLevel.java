@@ -72,6 +72,11 @@ public final class AtomicCounterLevel implements Level {
     }
 
     @Override
+    public String passingCondition() {
+        return "Counter ends at 43";
+    }
+
+    @Override
     public String fullSourceWith(String userCode) {
         StringBuilder sb = new StringBuilder();
         sb.append("import java.util.concurrent.atomic.AtomicInteger;\n\n");
