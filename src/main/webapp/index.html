@@ -30,10 +30,12 @@
         <p class="hint-line">Each <code>Thread.ofVirtual().start(() -&gt; { ... })</code> is one chef. This level pre-declares <code>int counter = 41;</code> and <code>Object counterLock = new Object();</code>. Click <em>Show full Java source</em> to see the wrapping class.</p>
         <textarea id="editor" spellcheck="false" autocomplete="off"></textarea>
         <div class="controls">
-          <button id="runBtn">Run</button>
+          <button id="runBtn">Run to end</button>
+          <button id="stepBtn">Step</button>
           <button id="resetBtn" class="secondary">Reset to starter</button>
           <button id="showSourceBtn" class="secondary">Show full Java source</button>
         </div>
+        <p class="hint-line"><strong>Step</strong> advances the simulation by one round (each chef gets a chance to do one instruction). Editing the code resets stepping.</p>
       </section>
 
       <section id="fullSourcePanel" class="panel hidden">

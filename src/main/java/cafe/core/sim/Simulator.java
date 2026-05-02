@@ -20,38 +20,68 @@ public final class Simulator {
     private final Map<String, Integer> globals = new LinkedHashMap<>();
     private final Map<String, String> lockOwner = new HashMap<>();
     private final List<String> events = new ArrayList<>();
+    private final List<ChefState> chefs = new ArrayList<>();
+    private int ticks;
+    private boolean finished;
+    private String error;
 
-    public SimulationResult run(Program program, Map<String, Integer> initialGlobals) {
+    public Simulator(Program program, Map<String, Integer> initialGlobals) {
         globals.putAll(initialGlobals);
-
-        List<ChefState> chefs = new ArrayList<>();
         for (ChefProgram chef : program.chefs()) {
             chefs.add(new ChefState(chef));
         }
+    }
 
-        int ticks = 0;
-        while (ticks++ < MAX_TICKS) {
-            boolean anyAlive = false;
-            boolean anyProgress = false;
+    public boolean isFinished() {
+        return finished;
+    }
 
-            for (ChefState chef : chefs) {
-                if (chef.done()) {
-                    continue;
-                }
-                anyAlive = true;
-                if (step(chef)) {
-                    anyProgress = true;
-                }
+    public SimulationResult snapshot() {
+        return new SimulationResult(events, globals, error);
+    }
+
+    public SimulationResult runToCompletion() {
+        while (stepRound()) {
+            // loop
+        }
+        return snapshot();
+    }
+
+    public boolean stepRound() {
+        if (finished) {
+            return false;
+        }
+        if (++ticks > MAX_TICKS) {
+            finish("Simulation exceeded " + MAX_TICKS + " ticks");
+            return false;
+        }
+        boolean anyAlive = false;
+        boolean anyProgress = false;
+
+        for (ChefState chef : chefs) {
+            if (chef.done()) {
+                continue;
             }
-
-            if (!anyAlive) {
-                return finish(null);
-            }
-            if (!anyProgress) {
-                return finish("Deadlock: " + describeDeadlock(chefs));
+            anyAlive = true;
+            if (step(chef)) {
+                anyProgress = true;
             }
         }
-        return finish("Simulation exceeded " + MAX_TICKS + " ticks");
+
+        if (!anyAlive) {
+            finish(null);
+            return false;
+        }
+        if (!anyProgress) {
+            finish("Deadlock: " + describeDeadlock(chefs));
+            return false;
+        }
+        return true;
+    }
+
+    private void finish(String err) {
+        this.finished = true;
+        this.error = err;
     }
 
     private boolean step(ChefState chef) {
@@ -142,6 +172,8 @@ public final class Simulator {
             return switch (bin.op()) {
                 case "+" -> l + r;
                 case "-" -> l - r;
+                case "*" -> l * r;
+                case "/" -> l / r;
                 default -> throw new SimulationException("Unknown operator: " + bin.op());
             };
         }
@@ -174,10 +206,6 @@ public final class Simulator {
 
     private void log(String message) {
         events.add(message);
-    }
-
-    private SimulationResult finish(String error) {
-        return new SimulationResult(events, globals, error);
     }
 
     private static final class ChefState {

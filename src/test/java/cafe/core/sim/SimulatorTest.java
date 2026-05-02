@@ -43,7 +43,7 @@ class SimulatorTest {
             });
             """, INT_LEVEL);
 
-        SimulationResult result = new Simulator().run(program, initial("counter", 41));
+        SimulationResult result = new Simulator(program, initial("counter", 41)).runToCompletion();
 
         assertNull(result.error());
         assertEquals(42, result.finalGlobals().get("counter"));
@@ -60,7 +60,7 @@ class SimulatorTest {
             });
             """, ATOMIC_LEVEL);
 
-        SimulationResult result = new Simulator().run(program, initial("counter", 41));
+        SimulationResult result = new Simulator(program, initial("counter", 41)).runToCompletion();
 
         assertNull(result.error());
         assertEquals(43, result.finalGlobals().get("counter"));
@@ -83,7 +83,7 @@ class SimulatorTest {
             });
             """, INT_LEVEL);
 
-        SimulationResult result = new Simulator().run(program, initial("counter", 41));
+        SimulationResult result = new Simulator(program, initial("counter", 41)).runToCompletion();
 
         assertNull(result.error());
         assertEquals(43, result.finalGlobals().get("counter"));
@@ -96,7 +96,7 @@ class SimulatorTest {
             Thread.ofVirtual().start(() -> { counter++; });
             """, INT_LEVEL);
 
-        SimulationResult result = new Simulator().run(program, initial("counter", 41));
+        SimulationResult result = new Simulator(program, initial("counter", 41)).runToCompletion();
 
         assertNull(result.error());
         assertEquals(42, result.finalGlobals().get("counter"));
@@ -119,7 +119,7 @@ class SimulatorTest {
             });
             """, KITCHEN);
 
-        SimulationResult result = new Simulator().run(program, Map.of());
+        SimulationResult result = new Simulator(program, Map.of()).runToCompletion();
 
         assertNotNull(result.error());
         assertTrue(result.error().startsWith("Deadlock"));
@@ -131,9 +131,36 @@ class SimulatorTest {
             Thread.ofVirtual().start(() -> { counter.incrementAndGet(); });
             """, ATOMIC_LEVEL);
 
-        SimulationResult result = new Simulator().run(program, initial("counter", 0));
+        SimulationResult result = new Simulator(program, initial("counter", 0)).runToCompletion();
 
         assertFalse(result.events().isEmpty());
+    }
+
+    @Test
+    void stepRoundAdvancesOneRoundAtATime() {
+        Program program = Parser.parse("""
+            Thread.ofVirtual().start(() -> {
+                int x = counter;
+                counter = x + 1;
+            });
+            Thread.ofVirtual().start(() -> {
+                int x = counter;
+                counter = x + 1;
+            });
+            """, INT_LEVEL);
+
+        Simulator sim = new Simulator(program, initial("counter", 41));
+        assertFalse(sim.isFinished());
+
+        assertTrue(sim.stepRound());
+        assertEquals(2, sim.snapshot().events().size());
+
+        assertTrue(sim.stepRound());
+        assertEquals(4, sim.snapshot().events().size());
+
+        assertFalse(sim.stepRound());
+        assertTrue(sim.isFinished());
+        assertEquals(42, sim.snapshot().finalGlobals().get("counter"));
     }
 
     private static Map<String, Integer> initial(String name, int value) {

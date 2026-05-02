@@ -15,15 +15,14 @@ real Java semantics.
 - `./gradlew build` produces a runnable WAR
 
 ### v0.2 — DSL + simulator
-- Indentation-based DSL: `chef "Name":` blocks, `read` / `write` / `atomicInc` / `lock` / `unlock` / `synchronized(...)` / `log`
+- Indentation-based DSL with `read` / `write` / `atomicInc` / `lock` / `unlock` / `synchronized` / `log`
 - Tokenizer + line-aware parser with helpful errors
 - Round-robin deterministic simulator with deadlock detection
 - `Level` interface + `Outcome` record
 - Editor UI: `<textarea>` + Run / Reset, hint reveal after N consecutive failures
 
 ### v0.3 — Java syntax
-- DSL replaced with a real subset of Java 21+
-- `Thread.ofVirtual().start(() -> { ... });` and `Thread.ofPlatform()`
+- DSL replaced with a real subset of Java 21+ (`Thread.ofVirtual().start(() -> { ... })`)
 - Statements: `int x = expr;`, `x = expr;`, `x++` / `+=`, `x.method(args)`, `synchronized (m) { ... }`, `System.out.println("...")`
 - Recursive-descent parser; expressions lift global reads into temp `Read` + `LocalSet`
 - `Show full Java source` button reveals the wrapping class with declarations spliced in
@@ -33,23 +32,20 @@ real Java semantics.
 - `cafe.core.SharedType` sealed: `IntType`, `AtomicIntegerType`, `MonitorType`, `LockType`
 - `Level.sharedDeclarations()` returns `Map<String, SharedType>`
 - Parser type-checks every operation; mismatched ops fail with messages that name the actual type and suggest the right syntax
-- L1 declares `int counter = 41;` + `Object counterLock = new Object();` — solutions are `synchronized` blocks (atomic moves to L2)
-- 26 JUnit 5 tests covering tokenizer, parser, simulator, and level
+- L1 declares `int counter = 41;` + `Object counterLock = new Object();` — solutions are `synchronized` blocks
+
+### v0.5 — Multi-level + persistence + step-through
+- L2: AtomicInteger Counter — `counter.incrementAndGet()` / `.set(...)`
+- L3: Deadlock Kitchen — two `Object` monitors, fixed via consistent lock ordering
+- `LevelRegistry` orders levels; UI breadcrumb tabs show progress and current location
+- Previous / Next nav buttons; tabs locked until prior levels are completed
+- localStorage persistence: completed-level set, last-edited code per level, current level — survives reloads
+- Reset button clears the current level's saved code only
+- **Step** button: round-robin one tick at a time. Refactored `Simulator` (stateful constructor + `stepRound()` / `runToCompletion()`) and `Level` (extracted `validate()` + `startSimulation()` defaults)
 
 ## Pending
 
-| # | Task |
-|---|---|
-| 17 | Add Level 2: AtomicInteger Counter |
-| 18 | Add Level 3: Deadlock Kitchen |
-| 19 | Build LevelRegistry + level navigation UI |
-| 20 | Persist progress via localStorage |
-| 21 | Add step-through mode (manual one-tick-at-a-time) |
-
-**Suggested order:** 17 → 19 → 18 → 20 → 21.
-L2 first (small, exercises typed parser end-to-end). Then navigation so multiple
-levels feel like a game. L3 once navigation exists. localStorage and stepping
-are polish that benefit from having ≥3 levels in place.
+(none — let me know what's next)
 
 ## Backlog (parked, not tracked as tasks)
 
@@ -61,3 +57,5 @@ are polish that benefit from having ≥3 levels in place.
 - Producer / Consumer level (`BlockingQueue`, `wait` / `notify`)
 - Virtual-thread vs platform-thread blocking comparison level
 - Generated downloadable `.java` file from the editor contents
+- Step one chef at a time (currently steps a full round)
+- Reset progress button (clear all completed + saved code)

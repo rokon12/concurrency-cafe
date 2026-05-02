@@ -1,14 +1,7 @@
 package cafe.core;
 
-import cafe.core.dsl.ParseException;
-import cafe.core.dsl.Parser;
-import cafe.core.dsl.Program;
-import cafe.core.sim.SimulationException;
 import cafe.core.sim.SimulationResult;
-import cafe.core.sim.Simulator;
 
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -93,7 +86,7 @@ public final class DeadlockKitchenLevel implements Level {
                 .append(";\n"));
         sb.append("\n");
         sb.append("    public static void main(String[] args) throws InterruptedException {\n");
-        sb.append(indent(userCode, "        "));
+        sb.append(LevelText.indent(userCode, "        "));
         sb.append("\n");
         sb.append("        // The simulator waits for chefs automatically.\n");
         sb.append("        // In real code you would call .join() on each Thread here.\n");
@@ -103,49 +96,19 @@ public final class DeadlockKitchenLevel implements Level {
     }
 
     @Override
-    public Outcome run(String code) {
-        try {
-            Program program = Parser.parse(code, DECLARATIONS);
-            SimulationResult sim = new Simulator().run(program, new LinkedHashMap<>());
-
-            if (sim.hasError()) {
-                return new Outcome(
-                    false,
-                    "Simulation halted: " + sim.error(),
-                    sim,
-                    List.of()
-                );
-            }
-
-            int ovenAcquires = countAcquires(sim.events(), "oven");
-            int fryerAcquires = countAcquires(sim.events(), "fryer");
-
-            if (ovenAcquires < 2 || fryerAcquires < 2) {
-                return new Outcome(
-                    false,
-                    "Each chef must cook with BOTH the oven and the fryer (current run: oven acquired "
-                        + ovenAcquires + " time(s), fryer " + fryerAcquires + " time(s)).",
-                    sim,
-                    List.of()
-                );
-            }
-
-            return new Outcome(
-                true,
-                "Both chefs plated their dishes — no deadlock.",
-                sim,
-                List.of()
-            );
-
-        } catch (ParseException e) {
-            List<String> errors = new ArrayList<>();
-            errors.add(e.getMessage());
-            return new Outcome(false, "Parse error", null, errors);
-        } catch (SimulationException e) {
-            List<String> errors = new ArrayList<>();
-            errors.add(e.getMessage());
-            return new Outcome(false, "Runtime error", null, errors);
+    public Outcome validate(SimulationResult sim) {
+        if (sim.hasError()) {
+            return new Outcome(false, "Simulation halted: " + sim.error(), sim, List.of());
         }
+        int ovenAcquires = countAcquires(sim.events(), "oven");
+        int fryerAcquires = countAcquires(sim.events(), "fryer");
+        if (ovenAcquires < 2 || fryerAcquires < 2) {
+            return new Outcome(false,
+                "Each chef must cook with BOTH the oven and the fryer (current run: oven acquired "
+                    + ovenAcquires + " time(s), fryer " + fryerAcquires + " time(s)).",
+                sim, List.of());
+        }
+        return new Outcome(true, "Both chefs plated their dishes — no deadlock.", sim, List.of());
     }
 
     private static int countAcquires(List<String> events, String lockName) {
@@ -157,20 +120,5 @@ public final class DeadlockKitchenLevel implements Level {
             }
         }
         return count;
-    }
-
-    private static String indent(String text, String prefix) {
-        StringBuilder sb = new StringBuilder();
-        boolean first = true;
-        for (String line : text.split("\n", -1)) {
-            if (!first) {
-                sb.append('\n');
-            }
-            first = false;
-            if (!line.isEmpty()) {
-                sb.append(prefix).append(line);
-            }
-        }
-        return sb.toString();
     }
 }
