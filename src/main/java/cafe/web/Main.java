@@ -41,6 +41,7 @@ public final class Main {
         Browser.onClick("prevBtn", Main::goToPrevious);
         Browser.onClick("nextBtn", Main::goToNext);
         Browser.onClickInside("breadcrumb", "data-level-index", Main::switchToLevel);
+        Browser.onClickInside("scheduleControls", "data-chef-index", Main::stepSpecificChef);
 
         loadProgressFromStorage();
 
@@ -98,6 +99,7 @@ public final class Main {
         renderFullSource();
         renderBreadcrumb();
         renderNavButtons();
+        renderSchedulePanel();
     }
 
     private static void reset() {
@@ -124,13 +126,45 @@ public final class Main {
 
         Outcome outcome = level.run(code);
         renderOutcome(outcome, level);
+        renderSchedulePanel();
     }
 
     private static void step() {
+        if (!ensureActiveSimulator()) {
+            return;
+        }
+        Level level = REGISTRY.get(currentIndex);
+        try {
+            activeSimulator.stepInstruction();
+        } catch (SimulationException e) {
+            activeSimulator = null;
+            activeSimulatorCode = null;
+            renderOutcome(new Outcome(false, "Runtime error", null, List.of(e.getMessage())), level);
+            return;
+        }
+        afterStep(level);
+    }
+
+    private static void stepSpecificChef(int chefIndex) {
+        if (!ensureActiveSimulator()) {
+            return;
+        }
+        Level level = REGISTRY.get(currentIndex);
+        try {
+            activeSimulator.stepChef(chefIndex);
+        } catch (SimulationException e) {
+            activeSimulator = null;
+            activeSimulatorCode = null;
+            renderOutcome(new Outcome(false, "Runtime error", null, List.of(e.getMessage())), level);
+            return;
+        }
+        afterStep(level);
+    }
+
+    private static boolean ensureActiveSimulator() {
         Level level = REGISTRY.get(currentIndex);
         String code = Browser.getValue("editor");
         Browser.setStorage(STORAGE_CODE_PREFIX + level.id(), code);
-
         if (activeSimulator == null
             || !code.equals(activeSimulatorCode)
             || activeSimulator.isFinished()) {
@@ -141,19 +175,13 @@ public final class Main {
                 activeSimulator = null;
                 activeSimulatorCode = null;
                 renderOutcome(new Outcome(false, "Parse error", null, List.of(e.getMessage())), level);
-                return;
+                return false;
             }
         }
+        return true;
+    }
 
-        try {
-            activeSimulator.stepInstruction();
-        } catch (SimulationException e) {
-            activeSimulator = null;
-            activeSimulatorCode = null;
-            renderOutcome(new Outcome(false, "Runtime error", null, List.of(e.getMessage())), level);
-            return;
-        }
-
+    private static void afterStep(Level level) {
         SimulationResult snap = activeSimulator.snapshot();
         if (activeSimulator.isFinished()) {
             Outcome outcome = level.validate(snap);
@@ -161,6 +189,7 @@ public final class Main {
         } else {
             renderInProgress(snap);
         }
+        renderSchedulePanel();
     }
 
     private static void switchToLevel(int index) {
@@ -241,6 +270,35 @@ public final class Main {
         }
         renderBreadcrumb();
         renderNavButtons();
+    }
+
+    private static void renderSchedulePanel() {
+        if (activeSimulator == null || activeSimulator.isFinished()) {
+            Browser.setClassName("schedulePanel", "panel hidden");
+            Browser.setHtml("scheduleControls", "");
+            return;
+        }
+        Browser.setClassName("schedulePanel", "panel");
+        StringBuilder sb = new StringBuilder();
+        for (Simulator.ChefSnapshot chef : activeSimulator.chefSnapshots()) {
+            String classes = "chef-step";
+            String label = chef.name();
+            boolean disabled = chef.done();
+            if (chef.done()) {
+                classes += " done";
+                label += " (done)";
+            } else if (chef.blockedOnLock() != null) {
+                classes += " blocked";
+                label += " (waiting on " + chef.blockedOnLock() + ")";
+            }
+            sb.append("<button class=\"").append(classes).append("\"")
+                .append(" data-chef-index=\"").append(chef.index()).append("\"")
+                .append(disabled ? " disabled" : "")
+                .append(">")
+                .append(escape(label))
+                .append("</button>");
+        }
+        Browser.setHtml("scheduleControls", sb.toString());
     }
 
     private static void renderInProgress(SimulationResult snap) {

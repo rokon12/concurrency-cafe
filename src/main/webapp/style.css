@@ -209,6 +209,35 @@ textarea#editor {
   display: none;
 }
 
+.schedule-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chef-step {
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  background: #fffaf0;
+  border: 1px solid #8b7355;
+  border-radius: 8px;
+  padding: 8px 14px;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.chef-step.blocked {
+  background: #fbe5d6;
+  border-color: #c97070;
+  color: #5e1f1f;
+}
+
+.chef-step.done {
+  background: #d4f0d4;
+  border-color: #6ba66b;
+  color: #1f5a1f;
+  opacity: 0.8;
+}
+
 .hint-line {
   margin: 0 0 12px 0;
   font-size: 0.92rem;

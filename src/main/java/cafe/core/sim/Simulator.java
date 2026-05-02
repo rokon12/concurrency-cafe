@@ -37,6 +37,59 @@ public final class Simulator {
         return finished;
     }
 
+    public record ChefSnapshot(int index, String name, boolean done, String blockedOnLock) {
+    }
+
+    public List<ChefSnapshot> chefSnapshots() {
+        List<ChefSnapshot> result = new ArrayList<>();
+        for (int i = 0; i < chefs.size(); i++) {
+            ChefState chef = chefs.get(i);
+            String blocked = null;
+            if (!chef.done()) {
+                Instruction nextInstr = chef.peek();
+                if (nextInstr instanceof Instruction.Lock l) {
+                    String holder = lockOwner.get(l.lockName());
+                    if (holder != null && !holder.equals(chef.name())) {
+                        blocked = l.lockName();
+                    }
+                }
+            }
+            result.add(new ChefSnapshot(i, chef.name(), chef.done(), blocked));
+        }
+        return result;
+    }
+
+    public boolean stepChef(int index) {
+        if (finished) {
+            return false;
+        }
+        if (index < 0 || index >= chefs.size()) {
+            return false;
+        }
+        if (++ticks > MAX_TICKS) {
+            finish("Simulation exceeded " + MAX_TICKS + " ticks");
+            return false;
+        }
+        ChefState chef = chefs.get(index);
+        if (chef.done()) {
+            return false;
+        }
+        boolean progressed = step(chef);
+        if (allChefsDone()) {
+            finish(null);
+        }
+        return progressed;
+    }
+
+    private boolean allChefsDone() {
+        for (ChefState chef : chefs) {
+            if (!chef.done()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     public SimulationResult snapshot() {
         return new SimulationResult(events, globals, error);
     }

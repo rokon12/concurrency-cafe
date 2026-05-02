@@ -195,6 +195,46 @@ class SimulatorTest {
     }
 
     @Test
+    void stepChefAdvancesOnlyTheSpecifiedChef() {
+        Program program = Parser.parse("""
+            Thread.ofVirtual().start(() -> { counter.incrementAndGet(); });
+            Thread.ofVirtual().start(() -> { counter.incrementAndGet(); });
+            """, ATOMIC_LEVEL);
+
+        Simulator sim = new Simulator(program, initial("counter", 0));
+
+        assertTrue(sim.stepChef(0));
+        assertEquals(1, sim.snapshot().finalGlobals().get("counter"));
+        assertEquals(1, sim.snapshot().events().size());
+
+        assertTrue(sim.stepChef(1));
+        assertEquals(2, sim.snapshot().finalGlobals().get("counter"));
+    }
+
+    @Test
+    void chefSnapshotsReportBlockedState() {
+        Program program = Parser.parse("""
+            Thread.ofVirtual().start(() -> {
+                synchronized (oven) { synchronized (fryer) {} }
+            });
+            Thread.ofVirtual().start(() -> {
+                synchronized (oven) {}
+            });
+            """, KITCHEN);
+
+        Simulator sim = new Simulator(program, Map.of());
+        var initial = sim.chefSnapshots();
+        assertEquals(2, initial.size());
+        assertNull(initial.get(0).blockedOnLock());
+        assertNull(initial.get(1).blockedOnLock());
+
+        sim.stepChef(0);
+        var snaps = sim.chefSnapshots();
+        assertNull(snaps.get(0).blockedOnLock(), "chef 0 holds oven, next is lock fryer (free)");
+        assertEquals("oven", snaps.get(1).blockedOnLock(), "chef 1 is waiting on oven");
+    }
+
+    @Test
     void stepInstructionDetectsDeadlockWhenNoChefCanProgress() {
         Program program = Parser.parse("""
             Thread.ofVirtual().start(() -> {
