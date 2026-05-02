@@ -94,7 +94,7 @@ public final class Main {
 
         Browser.setText("levelTitle", level.title());
         Browser.setText("levelIntro", level.intro());
-        Browser.setValue("editor", editorContent);
+        Browser.setEditorCode(editorContent);
         Browser.setHtml("metrics", "<p>Press <strong>Run to end</strong> for the full simulation, or <strong>Step</strong> to advance one round at a time.</p>");
         Browser.setHtml("eventLog", "<p>No events yet.</p>");
         Browser.setHtml("hintPanel", "");
@@ -126,7 +126,7 @@ public final class Main {
     private static void run() {
         stopPlay();
         Level level = REGISTRY.get(currentIndex);
-        String code = Browser.getValue("editor");
+        String code = Browser.getEditorCode();
         Browser.setStorage(STORAGE_CODE_PREFIX + level.id(), code);
         activeSimulator = null;
         activeSimulatorCode = null;
@@ -217,7 +217,7 @@ public final class Main {
 
     private static boolean ensureActiveSimulator() {
         Level level = REGISTRY.get(currentIndex);
-        String code = Browser.getValue("editor");
+        String code = Browser.getEditorCode();
         Browser.setStorage(STORAGE_CODE_PREFIX + level.id(), code);
         if (activeSimulator == null
             || !code.equals(activeSimulatorCode)
@@ -273,7 +273,7 @@ public final class Main {
 
     private static void saveCurrentEditor() {
         Level level = REGISTRY.get(currentIndex);
-        Browser.setStorage(STORAGE_CODE_PREFIX + level.id(), Browser.getValue("editor"));
+        Browser.setStorage(STORAGE_CODE_PREFIX + level.id(), Browser.getEditorCode());
     }
 
     private static boolean isAccessible(int index) {
@@ -409,7 +409,7 @@ public final class Main {
 
     private static void downloadJava() {
         Level level = REGISTRY.get(currentIndex);
-        String code = Browser.getValue("editor");
+        String code = Browser.getEditorCode();
         Browser.downloadFile(level.lessonClassName() + ".java", level.fullSourceWith(code));
     }
 
@@ -428,7 +428,7 @@ public final class Main {
         Browser.setText("showSourceBtn", "Hide full Java source");
         Browser.setClassName("fullSourcePanel", "panel");
         Level level = REGISTRY.get(currentIndex);
-        String code = Browser.getValue("editor");
+        String code = Browser.getEditorCode();
         Browser.setText("fullSource", level.fullSourceWith(code));
     }
 

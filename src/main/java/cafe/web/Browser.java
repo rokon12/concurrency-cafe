@@ -42,6 +42,12 @@ public final class Browser {
     )
     public static native String getValue(String id);
 
+    @JSBody(params = {}, script = "return window.cafeGetCode ? window.cafeGetCode() : '';")
+    public static native String getEditorCode();
+
+    @JSBody(params = { "code" }, script = "if (window.cafeSetCode) window.cafeSetCode(code);")
+    public static native void setEditorCode(String code);
+
     @JSBody(
         params = { "id", "className" },
         script = "document.getElementById(id).className = className;"

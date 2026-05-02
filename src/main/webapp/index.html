@@ -7,7 +7,7 @@
     <script src="js/cafe.js"></script>
   </head>
 
-  <body onload="main()">
+  <body>
     <main class="page">
       <header>
         <h1>Concurrency Café</h1>
@@ -30,9 +30,9 @@
       </section>
 
       <section class="panel">
-        <h2><label for="editor">Your code</label></h2>
+        <h2>Your code</h2>
         <p class="hint-line">Each <code>Thread.ofVirtual().start(() -&gt; { ... })</code> is one chef. This level pre-declares <code>int counter = 41;</code> and <code>Object counterLock = new Object();</code>. Click <em>Show full Java source</em> to see the wrapping class.</p>
-        <textarea id="editor" spellcheck="false" autocomplete="off"></textarea>
+        <div id="editorContainer" class="editor"></div>
         <div class="controls">
           <button id="runBtn">Run to end</button>
           <button id="stepBtn">Step</button>
@@ -84,5 +84,22 @@
         </ul>
       </section>
     </main>
+
+    <script type="module">
+      import {EditorView, basicSetup} from "https://cdn.jsdelivr.net/npm/codemirror@6.0.1/+esm";
+      import {java} from "https://cdn.jsdelivr.net/npm/@codemirror/lang-java@6.0.1/+esm";
+
+      const editor = new EditorView({
+        parent: document.getElementById('editorContainer'),
+        extensions: [basicSetup, java()]
+      });
+      window.cafeEditor = editor;
+      window.cafeGetCode = () => editor.state.doc.toString();
+      window.cafeSetCode = (s) => editor.dispatch({
+        changes: {from: 0, to: editor.state.doc.length, insert: s}
+      });
+
+      main();
+    </script>
   </body>
 </html>
