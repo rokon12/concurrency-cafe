@@ -79,6 +79,24 @@ public final class Browser {
     public static native void removeStorage(String key);
 
     @JSBody(
+        params = { "prefix" },
+        script =
+            "var keys = [];" +
+            "for (var i = 0; i < window.localStorage.length; i++) {" +
+            "  var k = window.localStorage.key(i);" +
+            "  if (k && k.indexOf(prefix) === 0) keys.push(k);" +
+            "}" +
+            "for (var j = 0; j < keys.length; j++) window.localStorage.removeItem(keys[j]);"
+    )
+    public static native void clearStoragePrefix(String prefix);
+
+    @JSBody(
+        params = { "message" },
+        script = "return window.confirm(message);"
+    )
+    public static native boolean confirm(String message);
+
+    @JSBody(
         params = { "containerId", "attribute", "callback" },
         script =
             "document.getElementById(containerId).addEventListener('click', function(e) {" +

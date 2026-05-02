@@ -51,6 +51,21 @@ button.secondary {
   background: #f0e4cf;
 }
 
+button.danger {
+  background: #f8d7d7;
+  border-color: #c97070;
+  color: #5e1f1f;
+}
+
+button.danger:hover {
+  background: #f5c0c0;
+}
+
+.progress-controls {
+  margin: 0 0 16px 0;
+  justify-content: flex-end;
+}
+
 .panel {
   background: white;
   border: 1px solid #e1d3bd;

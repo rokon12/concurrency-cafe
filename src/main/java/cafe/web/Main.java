@@ -35,6 +35,7 @@ public final class Main {
         Browser.onClick("runBtn", Main::run);
         Browser.onClick("stepBtn", Main::step);
         Browser.onClick("resetBtn", Main::reset);
+        Browser.onClick("resetProgressBtn", Main::resetAllProgress);
         Browser.onClick("showSourceBtn", Main::toggleFullSource);
         Browser.onClick("prevBtn", Main::goToPrevious);
         Browser.onClick("nextBtn", Main::goToNext);
@@ -102,6 +103,15 @@ public final class Main {
         Level level = REGISTRY.get(currentIndex);
         Browser.removeStorage(STORAGE_CODE_PREFIX + level.id());
         loadLevel(currentIndex);
+    }
+
+    private static void resetAllProgress() {
+        if (!Browser.confirm("Clear all completed levels and saved code? This cannot be undone.")) {
+            return;
+        }
+        Browser.clearStoragePrefix("cc.");
+        COMPLETED.clear();
+        loadLevel(0);
     }
 
     private static void run() {
