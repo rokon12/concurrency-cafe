@@ -50,6 +50,10 @@ public abstract class AbstractLevel implements Level {
                 imports.add("java.util.concurrent.locks.ReentrantLock");
             } else if (t instanceof SharedType.QueueType) {
                 imports.add("java.util.concurrent.ArrayBlockingQueue");
+            } else if (t instanceof SharedType.FixedExecutorType
+                    || t instanceof SharedType.VirtualExecutorType) {
+                imports.add("java.util.concurrent.ExecutorService");
+                imports.add("java.util.concurrent.Executors");
             }
         }
         for (String imp : imports) {

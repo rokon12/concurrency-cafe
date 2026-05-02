@@ -18,6 +18,7 @@ public final class Parser {
     private int tempCounter;
     private int virtualChefCounter;
     private int platformChefCounter;
+    private final java.util.Map<String, Integer> submitCounter = new java.util.HashMap<>();
 
     private Parser(List<Token> tokens, Map<String, SharedType> declarations) {
         this.tokens = tokens;
@@ -32,13 +33,54 @@ public final class Parser {
     private Program parseProgram() {
         List<ChefProgram> chefs = new ArrayList<>();
         while (pos < tokens.size()) {
-            chefs.add(parseChefDecl());
+            chefs.add(parseTopLevelChef());
         }
         if (chefs.isEmpty()) {
             throw new ParseException(1, 1,
-                "expected a chef declaration like 'Thread.ofVirtual().start(() -> { ... });'");
+                "expected 'Thread.ofVirtual().start(() -> { ... });' or 'pool.submit(() -> { ... });'");
         }
         return new Program(chefs);
+    }
+
+    private ChefProgram parseTopLevelChef() {
+        Token first = peek();
+        if (first.kind() == TokenKind.WORD && declarations.containsKey(first.text())) {
+            SharedType type = declarations.get(first.text());
+            if (type instanceof SharedType.FixedExecutorType
+                || type instanceof SharedType.VirtualExecutorType) {
+                return parseSubmit();
+            }
+        }
+        return parseChefDecl();
+    }
+
+    private ChefProgram parseSubmit() {
+        Token poolTok = peek();
+        advance();
+        String poolName = poolTok.text();
+        SharedType type = declarations.get(poolName);
+        ThreadKind kind = (type instanceof SharedType.VirtualExecutorType)
+            ? ThreadKind.VIRTUAL : ThreadKind.PLATFORM;
+
+        expectSymbol(".");
+        expectWord("'submit'", "submit");
+        expectSymbol("(");
+
+        locals.clear();
+        tempCounter = 0;
+
+        expectSymbol("(");
+        expectSymbol(")");
+        expectSymbol("->");
+        List<Instruction> body = parseBlock();
+
+        expectSymbol(")");
+        expectSymbol(";");
+
+        int count = submitCounter.getOrDefault(poolName, 0) + 1;
+        submitCounter.put(poolName, count);
+        String chefName = poolName + "-task-" + count;
+        return new ChefProgram(chefName, kind, poolName, body);
     }
 
     private ChefProgram parseChefDecl() {

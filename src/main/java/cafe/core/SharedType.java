@@ -97,4 +97,40 @@ public sealed interface SharedType {
             return "an ArrayBlockingQueue<Integer> (capacity " + capacity + ")";
         }
     }
+
+    record FixedExecutorType(int poolSize) implements SharedType {
+
+        @Override
+        public String javaTypeName() {
+            return "ExecutorService";
+        }
+
+        @Override
+        public String javaInitializer() {
+            return "Executors.newFixedThreadPool(" + poolSize + ")";
+        }
+
+        @Override
+        public String description() {
+            return "a fixed thread pool of " + poolSize;
+        }
+    }
+
+    record VirtualExecutorType() implements SharedType {
+
+        @Override
+        public String javaTypeName() {
+            return "ExecutorService";
+        }
+
+        @Override
+        public String javaInitializer() {
+            return "Executors.newVirtualThreadPerTaskExecutor()";
+        }
+
+        @Override
+        public String description() {
+            return "a virtual-thread-per-task executor";
+        }
+    }
 }

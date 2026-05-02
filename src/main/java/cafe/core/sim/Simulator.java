@@ -31,8 +31,8 @@ public final class Simulator {
     private int nextChefIndex;
     private boolean finished;
     private String error;
-    private int platformPoolSize = Integer.MAX_VALUE;
-    private int activePlatformSlots;
+    private final Map<String, Integer> executorPoolSize = new HashMap<>();
+    private final Map<String, Integer> activeExecutorSlots = new HashMap<>();
 
     public Simulator(Program program, Map<String, Integer> initialGlobals) {
         this(program, initialGlobals, Map.of());
@@ -42,9 +42,15 @@ public final class Simulator {
                      Map<String, SharedType> declarations) {
         globals.putAll(initialGlobals);
         for (var entry : declarations.entrySet()) {
-            if (entry.getValue() instanceof SharedType.QueueType q) {
-                queues.put(entry.getKey(), new ArrayDeque<>());
-                queueCapacity.put(entry.getKey(), q.capacity());
+            String name = entry.getKey();
+            SharedType type = entry.getValue();
+            if (type instanceof SharedType.QueueType q) {
+                queues.put(name, new ArrayDeque<>());
+                queueCapacity.put(name, q.capacity());
+            } else if (type instanceof SharedType.FixedExecutorType ex) {
+                executorPoolSize.put(name, ex.poolSize());
+            } else if (type instanceof SharedType.VirtualExecutorType) {
+                executorPoolSize.put(name, Integer.MAX_VALUE);
             }
         }
         for (ChefProgram chef : program.chefs()) {
@@ -56,15 +62,6 @@ public final class Simulator {
         return finished;
     }
 
-    /**
-     * Limit the number of {@code Thread.ofPlatform()} chefs that can be running
-     * (started but not done) at the same time. Virtual chefs are not bounded.
-     * Default is unbounded.
-     */
-    public void setPlatformPoolSize(int size) {
-        if (size < 1) throw new IllegalArgumentException("platform pool size must be >= 1");
-        this.platformPoolSize = size;
-    }
 
     public record ChefSnapshot(int index, String name, boolean done, String blockedOnLock,
                                String lastEventDetail, Map<String, Integer> locals) {
@@ -207,14 +204,18 @@ public final class Simulator {
     }
 
     private boolean step(ChefState chef) {
-        if (chef.program.kind() == ThreadKind.PLATFORM && !chef.platformSlotAcquired) {
-            if (activePlatformSlots >= platformPoolSize) {
+        String poolName = chef.program.executorName();
+        if (poolName != null && !chef.executorSlotAcquired) {
+            int cap = executorPoolSize.getOrDefault(poolName, Integer.MAX_VALUE);
+            int active = activeExecutorSlots.getOrDefault(poolName, 0);
+            if (active >= cap) {
                 return false;
             }
-            chef.platformSlotAcquired = true;
-            activePlatformSlots++;
-            log(chef.name() + " acquires a platform thread slot ("
-                + activePlatformSlots + "/" + platformPoolSize + ")");
+            chef.executorSlotAcquired = true;
+            activeExecutorSlots.put(poolName, active + 1);
+            String capLabel = cap == Integer.MAX_VALUE ? "∞" : String.valueOf(cap);
+            log(chef.name() + " acquires a slot in " + poolName
+                + " (" + (active + 1) + "/" + capLabel + ")");
         }
 
         Instruction next = chef.peek();
@@ -348,11 +349,15 @@ public final class Simulator {
 
     private void advanceAndMaybeRelease(ChefState chef) {
         chef.advance();
-        if (chef.done() && chef.platformSlotAcquired) {
-            chef.platformSlotAcquired = false;
-            activePlatformSlots--;
-            log(chef.name() + " releases its platform thread slot ("
-                + activePlatformSlots + "/" + platformPoolSize + ")");
+        String poolName = chef.program.executorName();
+        if (chef.done() && chef.executorSlotAcquired && poolName != null) {
+            chef.executorSlotAcquired = false;
+            int active = activeExecutorSlots.getOrDefault(poolName, 0) - 1;
+            activeExecutorSlots.put(poolName, active);
+            int cap = executorPoolSize.getOrDefault(poolName, Integer.MAX_VALUE);
+            String capLabel = cap == Integer.MAX_VALUE ? "∞" : String.valueOf(cap);
+            log(chef.name() + " releases its slot in " + poolName
+                + " (" + active + "/" + capLabel + ")");
         }
     }
 
@@ -422,7 +427,7 @@ public final class Simulator {
         private final Set<String> heldLocks = new HashSet<>();
         private int pc;
         private String lastEventDetail;
-        private boolean platformSlotAcquired;
+        private boolean executorSlotAcquired;
 
         ChefState(ChefProgram program) {
             this.program = program;

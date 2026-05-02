@@ -37,15 +37,6 @@ public interface Level {
         return "Pass the level";
     }
 
-    /**
-     * Maximum number of {@code Thread.ofPlatform()} chefs that can be running
-     * (started but not done) simultaneously. Default is unbounded; levels can
-     * override to demonstrate platform-thread starvation vs virtual threads.
-     */
-    default int platformPoolSize() {
-        return Integer.MAX_VALUE;
-    }
-
     Outcome validate(SimulationResult sim);
 
     default Map<String, Integer> initialGlobals() {
@@ -62,11 +53,7 @@ public interface Level {
 
     default Simulator startSimulation(String code) {
         Program program = Parser.parse(code, sharedDeclarations());
-        Simulator sim = new Simulator(program, initialGlobals(), sharedDeclarations());
-        if (platformPoolSize() != Integer.MAX_VALUE) {
-            sim.setPlatformPoolSize(platformPoolSize());
-        }
-        return sim;
+        return new Simulator(program, initialGlobals(), sharedDeclarations());
     }
 
     default Outcome run(String code) {
