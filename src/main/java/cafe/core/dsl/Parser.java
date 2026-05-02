@@ -105,7 +105,8 @@ public final class Parser {
         expectSymbol(")");
         expectSymbol(";");
 
-        return new ChefProgram(chefName, body);
+        ThreadKind kind = virtual ? ThreadKind.VIRTUAL : ThreadKind.PLATFORM;
+        return new ChefProgram(chefName, kind, body);
     }
 
     private List<Instruction> parseBlock() {

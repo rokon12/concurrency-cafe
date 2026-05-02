@@ -5,6 +5,7 @@ import cafe.core.dsl.ChefProgram;
 import cafe.core.dsl.Expression;
 import cafe.core.dsl.Instruction;
 import cafe.core.dsl.Program;
+import cafe.core.dsl.ThreadKind;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -30,6 +31,8 @@ public final class Simulator {
     private int nextChefIndex;
     private boolean finished;
     private String error;
+    private int platformPoolSize = Integer.MAX_VALUE;
+    private int activePlatformSlots;
 
     public Simulator(Program program, Map<String, Integer> initialGlobals) {
         this(program, initialGlobals, Map.of());
@@ -51,6 +54,16 @@ public final class Simulator {
 
     public boolean isFinished() {
         return finished;
+    }
+
+    /**
+     * Limit the number of {@code Thread.ofPlatform()} chefs that can be running
+     * (started but not done) at the same time. Virtual chefs are not bounded.
+     * Default is unbounded.
+     */
+    public void setPlatformPoolSize(int size) {
+        if (size < 1) throw new IllegalArgumentException("platform pool size must be >= 1");
+        this.platformPoolSize = size;
     }
 
     public record ChefSnapshot(int index, String name, boolean done, String blockedOnLock,
@@ -194,6 +207,16 @@ public final class Simulator {
     }
 
     private boolean step(ChefState chef) {
+        if (chef.program.kind() == ThreadKind.PLATFORM && !chef.platformSlotAcquired) {
+            if (activePlatformSlots >= platformPoolSize) {
+                return false;
+            }
+            chef.platformSlotAcquired = true;
+            activePlatformSlots++;
+            log(chef.name() + " acquires a platform thread slot ("
+                + activePlatformSlots + "/" + platformPoolSize + ")");
+        }
+
         Instruction next = chef.peek();
         if (next instanceof Instruction.Lock l) {
             String holder = lockOwner.get(l.lockName());
@@ -203,7 +226,7 @@ public final class Simulator {
             lockOwner.put(l.lockName(), chef.name());
             chef.recordHeld(l.lockName());
             recordEvent(chef, "acquires lock '" + l.lockName() + "'");
-            chef.advance();
+            advanceAndMaybeRelease(chef);
             return true;
         }
 
@@ -215,7 +238,7 @@ public final class Simulator {
             }
             lockOwner.remove(u.lockName());
             recordEvent(chef, "releases lock '" + u.lockName() + "'");
-            chef.advance();
+            advanceAndMaybeRelease(chef);
             return true;
         }
 
@@ -223,7 +246,7 @@ public final class Simulator {
             int value = globals.getOrDefault(r.globalName(), 0);
             chef.setLocal(r.localName(), value);
             recordEvent(chef, "reads " + r.globalName() + " = " + value);
-            chef.advance();
+            advanceAndMaybeRelease(chef);
             return true;
         }
 
@@ -231,7 +254,7 @@ public final class Simulator {
             int value = evaluate(chef, w.value());
             globals.put(w.globalName(), value);
             recordEvent(chef, "writes " + w.globalName() + " = " + value);
-            chef.advance();
+            advanceAndMaybeRelease(chef);
             return true;
         }
 
@@ -239,7 +262,7 @@ public final class Simulator {
             int value = globals.getOrDefault(a.globalName(), 0) + 1;
             globals.put(a.globalName(), value);
             recordEvent(chef, "atomically increments " + a.globalName() + " to " + value);
-            chef.advance();
+            advanceAndMaybeRelease(chef);
             return true;
         }
 
@@ -248,7 +271,7 @@ public final class Simulator {
             int value = globals.getOrDefault(a.globalName(), 0) + delta;
             globals.put(a.globalName(), value);
             recordEvent(chef, "atomically adds " + delta + " to " + a.globalName() + " (now " + value + ")");
-            chef.advance();
+            advanceAndMaybeRelease(chef);
             return true;
         }
 
@@ -262,14 +285,14 @@ public final class Simulator {
             } else {
                 recordEvent(chef, "CAS " + c.globalName() + ": expected " + expected + ", saw " + current + " (failure)");
             }
-            chef.advance();
+            advanceAndMaybeRelease(chef);
             return true;
         }
 
         if (next instanceof Instruction.Log lg) {
             chef.lastEventDetail = "logs: " + lg.message();
             log(chef.name() + ": " + lg.message());
-            chef.advance();
+            advanceAndMaybeRelease(chef);
             return true;
         }
 
@@ -277,7 +300,7 @@ public final class Simulator {
             int value = evaluate(chef, ls.value());
             chef.setLocal(ls.localName(), value);
             recordEvent(chef, "sets " + ls.localName() + " = " + value);
-            chef.advance();
+            advanceAndMaybeRelease(chef);
             return true;
         }
 
@@ -294,7 +317,7 @@ public final class Simulator {
             q.addLast(value);
             recordEvent(chef, "puts " + value + " into " + put.queueName()
                 + " (size " + q.size() + "/" + cap + ")");
-            chef.advance();
+            advanceAndMaybeRelease(chef);
             return true;
         }
 
@@ -311,7 +334,7 @@ public final class Simulator {
             int cap = queueCapacity.getOrDefault(take.queueName(), Integer.MAX_VALUE);
             recordEvent(chef, "takes " + value + " from " + take.queueName()
                 + " (size " + q.size() + "/" + cap + ")");
-            chef.advance();
+            advanceAndMaybeRelease(chef);
             return true;
         }
 
@@ -321,6 +344,16 @@ public final class Simulator {
     private void recordEvent(ChefState chef, String detail) {
         chef.lastEventDetail = detail;
         log(chef.name() + " " + detail);
+    }
+
+    private void advanceAndMaybeRelease(ChefState chef) {
+        chef.advance();
+        if (chef.done() && chef.platformSlotAcquired) {
+            chef.platformSlotAcquired = false;
+            activePlatformSlots--;
+            log(chef.name() + " releases its platform thread slot ("
+                + activePlatformSlots + "/" + platformPoolSize + ")");
+        }
     }
 
     private int evaluate(ChefState chef, Expression expr) {
@@ -389,6 +422,7 @@ public final class Simulator {
         private final Set<String> heldLocks = new HashSet<>();
         private int pc;
         private String lastEventDetail;
+        private boolean platformSlotAcquired;
 
         ChefState(ChefProgram program) {
             this.program = program;

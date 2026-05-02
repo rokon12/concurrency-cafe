@@ -755,6 +755,7 @@ public final class Main {
             case "deadlock-kitchen" -> "Both chefs serve.";
             case "many-chefs" -> "All four counted.";
             case "producer-consumer" -> "Orders flow.";
+            case "virtual-vs-platform" -> "Park, don't block.";
             default -> "Level complete.";
         };
     }
@@ -768,6 +769,7 @@ public final class Main {
             case "deadlock-kitchen" -> "Consistent lock ordering breaks the cycle. Every chef now grabs the oven first, then the fryer.";
             case "many-chefs" -> "The same lock that fixed two chefs scales to four. Synchronization serializes the work — that's the cost.";
             case "producer-consumer" -> "BlockingQueue is the cooperation primitive: producer parks when full, consumer parks when empty. The handoff is the lesson.";
+            case "virtual-vs-platform" -> "Virtual threads park instead of blocking an OS thread. With a small platform pool, this is the difference between a working app and a deadlocked one.";
             default -> "Bug squashed. On to the next.";
         };
     }
