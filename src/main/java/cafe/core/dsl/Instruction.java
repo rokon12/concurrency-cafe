@@ -13,6 +13,12 @@ public sealed interface Instruction {
     record AtomicInc(String globalName, int line) implements Instruction {
     }
 
+    record AtomicAdd(String globalName, Expression delta, int line) implements Instruction {
+    }
+
+    record AtomicCAS(String globalName, Expression expected, Expression newValue, int line) implements Instruction {
+    }
+
     record Lock(String lockName, int line) implements Instruction {
     }
 

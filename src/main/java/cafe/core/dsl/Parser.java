@@ -352,6 +352,25 @@ public final class Parser {
                 Expression rewritten = liftGlobalReads(args.get(0), out, line);
                 out.add(new Instruction.Write(target, rewritten, line));
             }
+            case "addAndGet", "getAndAdd" -> {
+                requireType(type, SharedType.AtomicIntegerType.class, targetTok, target,
+                    "'." + method + "(...)' is only valid on AtomicInteger");
+                if (args.size() != 1) {
+                    throw error(methodTok, "'" + method + "' takes exactly one argument");
+                }
+                Expression rewritten = liftGlobalReads(args.get(0), out, line);
+                out.add(new Instruction.AtomicAdd(target, rewritten, line));
+            }
+            case "compareAndSet" -> {
+                requireType(type, SharedType.AtomicIntegerType.class, targetTok, target,
+                    "'.compareAndSet(...)' is only valid on AtomicInteger");
+                if (args.size() != 2) {
+                    throw error(methodTok, "'compareAndSet' takes exactly two arguments (expected, new)");
+                }
+                Expression expected = liftGlobalReads(args.get(0), out, line);
+                Expression newVal = liftGlobalReads(args.get(1), out, line);
+                out.add(new Instruction.AtomicCAS(target, expected, newVal, line));
+            }
             case "lock" -> {
                 requireType(type, SharedType.LockType.class, targetTok, target,
                     "'.lock()' is only valid on ReentrantLock");
@@ -370,7 +389,7 @@ public final class Parser {
             }
             default -> throw error(methodTok,
                 "unsupported method '" + method + "' on " + type.description()
-                    + " (try incrementAndGet, set, lock, or unlock)");
+                    + " (try incrementAndGet, addAndGet, compareAndSet, set, lock, or unlock)");
         }
     }
 

@@ -172,6 +172,29 @@ public final class Simulator {
             return true;
         }
 
+        if (next instanceof Instruction.AtomicAdd a) {
+            int delta = evaluate(chef, a.delta());
+            int value = globals.getOrDefault(a.globalName(), 0) + delta;
+            globals.put(a.globalName(), value);
+            log(chef.name() + " atomically adds " + delta + " to " + a.globalName() + " (now " + value + ")");
+            chef.advance();
+            return true;
+        }
+
+        if (next instanceof Instruction.AtomicCAS c) {
+            int expected = evaluate(chef, c.expected());
+            int current = globals.getOrDefault(c.globalName(), 0);
+            if (current == expected) {
+                int newVal = evaluate(chef, c.newValue());
+                globals.put(c.globalName(), newVal);
+                log(chef.name() + " CAS " + c.globalName() + ": " + expected + " → " + newVal + " (success)");
+            } else {
+                log(chef.name() + " CAS " + c.globalName() + ": expected " + expected + ", saw " + current + " (failure)");
+            }
+            chef.advance();
+            return true;
+        }
+
         if (next instanceof Instruction.Log lg) {
             log(chef.name() + ": " + lg.message());
             chef.advance();

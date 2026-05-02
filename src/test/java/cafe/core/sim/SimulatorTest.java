@@ -137,6 +137,39 @@ class SimulatorTest {
     }
 
     @Test
+    void addAndGetAddsAtomically() {
+        Program program = Parser.parse("""
+            Thread.ofVirtual().start(() -> { counter.addAndGet(3); });
+            Thread.ofVirtual().start(() -> { counter.addAndGet(4); });
+            """, ATOMIC_LEVEL);
+
+        SimulationResult result = new Simulator(program, initial("counter", 10)).runToCompletion();
+
+        assertNull(result.error());
+        assertEquals(17, result.finalGlobals().get("counter"));
+    }
+
+    @Test
+    void compareAndSetSucceedsOnlyWhenCurrentMatches() {
+        Program program = Parser.parse("""
+            Thread.ofVirtual().start(() -> { counter.compareAndSet(0, 7); });
+            """, ATOMIC_LEVEL);
+
+        SimulationResult result = new Simulator(program, initial("counter", 0)).runToCompletion();
+        assertEquals(7, result.finalGlobals().get("counter"));
+    }
+
+    @Test
+    void compareAndSetFailsSilentlyWhenCurrentDoesNotMatch() {
+        Program program = Parser.parse("""
+            Thread.ofVirtual().start(() -> { counter.compareAndSet(0, 7); });
+            """, ATOMIC_LEVEL);
+
+        SimulationResult result = new Simulator(program, initial("counter", 5)).runToCompletion();
+        assertEquals(5, result.finalGlobals().get("counter"));
+    }
+
+    @Test
     void stepInstructionAdvancesOneChefAtATime() {
         Program program = Parser.parse("""
             Thread.ofVirtual().start(() -> {

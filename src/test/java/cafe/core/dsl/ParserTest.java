@@ -214,6 +214,41 @@ class ParserTest {
     }
 
     @Test
+    void addAndGetCompilesToAtomicAdd() {
+        Program program = Parser.parse("""
+            Thread.ofVirtual().start(() -> {
+                counter.addAndGet(5);
+            });
+            """, ATOMIC_LEVEL);
+
+        var body = program.chefs().get(0).instructions();
+        assertEquals(1, body.size());
+        assertInstanceOf(Instruction.AtomicAdd.class, body.get(0));
+    }
+
+    @Test
+    void compareAndSetCompilesToAtomicCAS() {
+        Program program = Parser.parse("""
+            Thread.ofVirtual().start(() -> {
+                counter.compareAndSet(41, 42);
+            });
+            """, ATOMIC_LEVEL);
+
+        var body = program.chefs().get(0).instructions();
+        assertEquals(1, body.size());
+        assertInstanceOf(Instruction.AtomicCAS.class, body.get(0));
+    }
+
+    @Test
+    void compareAndSetWithWrongArityIsRejected() {
+        assertThrows(ParseException.class, () -> Parser.parse("""
+            Thread.ofVirtual().start(() -> {
+                counter.compareAndSet(42);
+            });
+            """, ATOMIC_LEVEL));
+    }
+
+    @Test
     void atomicSetCompilesToWrite() {
         Program program = Parser.parse("""
             Thread.ofVirtual().start(() -> {
