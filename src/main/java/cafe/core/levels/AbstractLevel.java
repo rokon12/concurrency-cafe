@@ -48,6 +48,8 @@ public abstract class AbstractLevel implements Level {
                 imports.add("java.util.concurrent.atomic.AtomicInteger");
             } else if (t instanceof SharedType.LockType) {
                 imports.add("java.util.concurrent.locks.ReentrantLock");
+            } else if (t instanceof SharedType.QueueType) {
+                imports.add("java.util.concurrent.ArrayBlockingQueue");
             }
         }
         for (String imp : imports) {

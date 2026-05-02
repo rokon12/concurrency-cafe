@@ -753,6 +753,8 @@ public final class Main {
             case "atomic-add" -> "+5, atomically.";
             case "reentrant-lock" -> "Lock acquired, released, repeat.";
             case "deadlock-kitchen" -> "Both chefs serve.";
+            case "many-chefs" -> "All four counted.";
+            case "producer-consumer" -> "Orders flow.";
             default -> "Level complete.";
         };
     }
@@ -764,6 +766,8 @@ public final class Main {
             case "atomic-add" -> "addAndGet(n) is just incrementAndGet generalized — atomically add anything you want, lock-free.";
             case "reentrant-lock" -> "ReentrantLock is the explicit cousin of synchronized: lock(), do work, unlock(). In real code wrap unlock in finally.";
             case "deadlock-kitchen" -> "Consistent lock ordering breaks the cycle. Every chef now grabs the oven first, then the fryer.";
+            case "many-chefs" -> "The same lock that fixed two chefs scales to four. Synchronization serializes the work — that's the cost.";
+            case "producer-consumer" -> "BlockingQueue is the cooperation primitive: producer parks when full, consumer parks when empty. The handoff is the lesson.";
             default -> "Bug squashed. On to the next.";
         };
     }

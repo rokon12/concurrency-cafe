@@ -1,11 +1,14 @@
 package cafe.core.sim;
 
+import cafe.core.SharedType;
 import cafe.core.dsl.ChefProgram;
 import cafe.core.dsl.Expression;
 import cafe.core.dsl.Instruction;
 import cafe.core.dsl.Program;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -19,6 +22,8 @@ public final class Simulator {
 
     private final Map<String, Integer> globals = new LinkedHashMap<>();
     private final Map<String, String> lockOwner = new HashMap<>();
+    private final Map<String, Deque<Integer>> queues = new LinkedHashMap<>();
+    private final Map<String, Integer> queueCapacity = new HashMap<>();
     private final List<String> events = new ArrayList<>();
     private final List<ChefState> chefs = new ArrayList<>();
     private int ticks;
@@ -27,7 +32,18 @@ public final class Simulator {
     private String error;
 
     public Simulator(Program program, Map<String, Integer> initialGlobals) {
+        this(program, initialGlobals, Map.of());
+    }
+
+    public Simulator(Program program, Map<String, Integer> initialGlobals,
+                     Map<String, SharedType> declarations) {
         globals.putAll(initialGlobals);
+        for (var entry : declarations.entrySet()) {
+            if (entry.getValue() instanceof SharedType.QueueType q) {
+                queues.put(entry.getKey(), new ArrayDeque<>());
+                queueCapacity.put(entry.getKey(), q.capacity());
+            }
+        }
         for (ChefProgram chef : program.chefs()) {
             chefs.add(new ChefState(chef));
         }
@@ -265,6 +281,40 @@ public final class Simulator {
             return true;
         }
 
+        if (next instanceof Instruction.QueuePut put) {
+            Deque<Integer> q = queues.get(put.queueName());
+            if (q == null) {
+                throw new SimulationException("queue '" + put.queueName() + "' is not declared");
+            }
+            int cap = queueCapacity.getOrDefault(put.queueName(), Integer.MAX_VALUE);
+            if (q.size() >= cap) {
+                return false;
+            }
+            int value = evaluate(chef, put.value());
+            q.addLast(value);
+            recordEvent(chef, "puts " + value + " into " + put.queueName()
+                + " (size " + q.size() + "/" + cap + ")");
+            chef.advance();
+            return true;
+        }
+
+        if (next instanceof Instruction.QueueTake take) {
+            Deque<Integer> q = queues.get(take.queueName());
+            if (q == null) {
+                throw new SimulationException("queue '" + take.queueName() + "' is not declared");
+            }
+            if (q.isEmpty()) {
+                return false;
+            }
+            int value = q.removeFirst();
+            chef.setLocal(take.localName(), value);
+            int cap = queueCapacity.getOrDefault(take.queueName(), Integer.MAX_VALUE);
+            recordEvent(chef, "takes " + value + " from " + take.queueName()
+                + " (size " + q.size() + "/" + cap + ")");
+            chef.advance();
+            return true;
+        }
+
         throw new SimulationException("Unknown instruction: " + next);
     }
 
@@ -310,16 +360,19 @@ public final class Simulator {
                 continue;
             }
             Instruction next = chef.peek();
+            String reason = null;
             if (next instanceof Instruction.Lock l) {
                 String holder = lockOwner.get(l.lockName());
-                if (!first) {
-                    sb.append("; ");
-                }
-                sb.append(chef.name())
-                    .append(" waits on '")
-                    .append(l.lockName())
-                    .append("' held by ")
-                    .append(holder == null ? "?" : holder);
+                reason = "waits on lock '" + l.lockName() + "' held by "
+                    + (holder == null ? "?" : holder);
+            } else if (next instanceof Instruction.QueuePut put) {
+                reason = "waits to put into '" + put.queueName() + "' (full)";
+            } else if (next instanceof Instruction.QueueTake take) {
+                reason = "waits to take from '" + take.queueName() + "' (empty)";
+            }
+            if (reason != null) {
+                if (!first) sb.append("; ");
+                sb.append(chef.name()).append(" ").append(reason);
                 first = false;
             }
         }

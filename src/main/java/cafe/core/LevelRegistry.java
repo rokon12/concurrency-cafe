@@ -5,6 +5,7 @@ import cafe.core.levels.AtomicCounterLevel;
 import cafe.core.levels.DeadlockKitchenLevel;
 import cafe.core.levels.LostUpdateLevel;
 import cafe.core.levels.ManyChefsLevel;
+import cafe.core.levels.ProducerConsumerLevel;
 import cafe.core.levels.ReentrantLockLevel;
 
 import java.util.List;
@@ -30,7 +31,8 @@ public record LevelRegistry(List<Level> levels) {
             new AtomicCounterLevel(),
             new AtomicAddLevel(),
             new ReentrantLockLevel(),
-            new DeadlockKitchenLevel()
+            new DeadlockKitchenLevel(),
+            new ProducerConsumerLevel()
         ));
     }
 

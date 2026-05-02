@@ -53,7 +53,7 @@ public interface Level {
 
     default Simulator startSimulation(String code) {
         Program program = Parser.parse(code, sharedDeclarations());
-        return new Simulator(program, initialGlobals());
+        return new Simulator(program, initialGlobals(), sharedDeclarations());
     }
 
     default Outcome run(String code) {

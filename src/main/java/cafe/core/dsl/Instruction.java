@@ -30,4 +30,10 @@ public sealed interface Instruction {
 
     record LocalSet(String localName, Expression value, int line) implements Instruction {
     }
+
+    record QueuePut(String queueName, Expression value, int line) implements Instruction {
+    }
+
+    record QueueTake(String localName, String queueName, int line) implements Instruction {
+    }
 }

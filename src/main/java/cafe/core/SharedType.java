@@ -79,4 +79,22 @@ public sealed interface SharedType {
             return "a ReentrantLock";
         }
     }
+
+    record QueueType(int capacity) implements SharedType {
+
+        @Override
+        public String javaTypeName() {
+            return "ArrayBlockingQueue<Integer>";
+        }
+
+        @Override
+        public String javaInitializer() {
+            return "new ArrayBlockingQueue<>(" + capacity + ")";
+        }
+
+        @Override
+        public String description() {
+            return "an ArrayBlockingQueue<Integer> (capacity " + capacity + ")";
+        }
+    }
 }

@@ -207,6 +207,8 @@ public final class Parser {
             out.add(new Instruction.Read(name, v.name(), intTok.line()));
         } else if (expr instanceof Expression.AtomicGet ag) {
             out.add(new Instruction.Read(name, ag.name(), intTok.line()));
+        } else if (expr instanceof Expression.QueueTake qt) {
+            out.add(new Instruction.QueueTake(name, qt.name(), intTok.line()));
         } else {
             int line = intTok.line();
             Expression rewritten = liftGlobalReads(expr, out, line);
@@ -236,8 +238,12 @@ public final class Parser {
             Expression rewritten = liftGlobalReads(expr, out, line);
             out.add(new Instruction.Write(name, rewritten, line));
         } else if (locals.contains(name)) {
-            Expression rewritten = liftGlobalReads(expr, out, line);
-            out.add(new Instruction.LocalSet(name, rewritten, line));
+            if (expr instanceof Expression.QueueTake qt) {
+                out.add(new Instruction.QueueTake(name, qt.name(), line));
+            } else {
+                Expression rewritten = liftGlobalReads(expr, out, line);
+                out.add(new Instruction.LocalSet(name, rewritten, line));
+            }
         } else {
             throw error(nameTok, "unknown variable '" + name + "'");
         }
@@ -389,9 +395,18 @@ public final class Parser {
                 }
                 out.add(new Instruction.Unlock(target, line));
             }
+            case "put" -> {
+                requireType(type, SharedType.QueueType.class, targetTok, target,
+                    "'.put(...)' is only valid on a BlockingQueue");
+                if (args.size() != 1) {
+                    throw error(methodTok, "'put' takes exactly one argument");
+                }
+                Expression rewritten = liftGlobalReads(args.get(0), out, line);
+                out.add(new Instruction.QueuePut(target, rewritten, line));
+            }
             default -> throw error(methodTok,
                 "unsupported method '" + method + "' on " + type.description()
-                    + " (try incrementAndGet, addAndGet, compareAndSet, set, lock, or unlock)");
+                    + " (try incrementAndGet, addAndGet, compareAndSet, set, lock, unlock, or put)");
         }
     }
 
@@ -467,19 +482,26 @@ public final class Parser {
                 expectSymbol(")");
                 String name = tok.text();
                 String method = methodTok.text();
-                if (!method.equals("get")) {
-                    throw error(methodTok,
-                        "only '.get()' is supported inside expressions; got '." + method + "()'");
-                }
                 SharedType type = declarations.get(name);
                 if (type == null) {
                     throw error(tok, "'" + name + "' is not a known shared variable");
                 }
-                if (!(type instanceof SharedType.AtomicIntegerType)) {
-                    throw error(tok, "'" + name + "' is " + type.description()
-                        + " — '.get()' is only valid on AtomicInteger");
+                if (method.equals("get")) {
+                    if (!(type instanceof SharedType.AtomicIntegerType)) {
+                        throw error(tok, "'" + name + "' is " + type.description()
+                            + " — '.get()' is only valid on AtomicInteger");
+                    }
+                    return new Expression.AtomicGet(name);
                 }
-                return new Expression.AtomicGet(name);
+                if (method.equals("take")) {
+                    if (!(type instanceof SharedType.QueueType)) {
+                        throw error(tok, "'" + name + "' is " + type.description()
+                            + " — '.take()' is only valid on a BlockingQueue");
+                    }
+                    return new Expression.QueueTake(name);
+                }
+                throw error(methodTok,
+                    "only '.get()' and '.take()' are supported inside expressions; got '." + method + "()'");
             }
             return new Expression.Var(tok.text());
         }
@@ -505,6 +527,11 @@ public final class Parser {
         if (expr instanceof Expression.AtomicGet ag) {
             String temp = freshTemp();
             out.add(new Instruction.Read(temp, ag.name(), line));
+            return new Expression.Var(temp);
+        }
+        if (expr instanceof Expression.QueueTake qt) {
+            String temp = freshTemp();
+            out.add(new Instruction.QueueTake(temp, qt.name(), line));
             return new Expression.Var(temp);
         }
         if (expr instanceof Expression.BinOp bin) {

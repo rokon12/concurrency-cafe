@@ -13,4 +13,7 @@ public sealed interface Expression {
 
     record AtomicGet(String name) implements Expression {
     }
+
+    record QueueTake(String name) implements Expression {
+    }
 }
