@@ -61,6 +61,24 @@ public final class Browser {
     public static native void onClick(String id, Callback callback);
 
     @JSBody(
+        params = { "key" },
+        script = "var v = window.localStorage.getItem(key); return v === null ? null : v;"
+    )
+    public static native String getStorage(String key);
+
+    @JSBody(
+        params = { "key", "value" },
+        script = "window.localStorage.setItem(key, value);"
+    )
+    public static native void setStorage(String key, String value);
+
+    @JSBody(
+        params = { "key" },
+        script = "window.localStorage.removeItem(key);"
+    )
+    public static native void removeStorage(String key);
+
+    @JSBody(
         params = { "containerId", "attribute", "callback" },
         script =
             "document.getElementById(containerId).addEventListener('click', function(e) {" +

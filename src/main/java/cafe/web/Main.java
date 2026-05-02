@@ -13,6 +13,10 @@ public final class Main {
 
     private static final int HINT_AFTER_FAILS = 2;
 
+    private static final String STORAGE_COMPLETED = "cc.completed";
+    private static final String STORAGE_CURRENT = "cc.current";
+    private static final String STORAGE_CODE_PREFIX = "cc.code.";
+
     private static final LevelRegistry REGISTRY = LevelRegistry.defaultRegistry();
     private static final Set<String> COMPLETED = new HashSet<>();
 
@@ -29,7 +33,32 @@ public final class Main {
         Browser.onClick("nextBtn", Main::goToNext);
         Browser.onClickInside("breadcrumb", "data-level-index", Main::switchToLevel);
 
-        loadLevel(0);
+        loadProgressFromStorage();
+
+        String savedId = Browser.getStorage(STORAGE_CURRENT);
+        int startIndex = 0;
+        if (savedId != null) {
+            int found = REGISTRY.indexOf(savedId);
+            if (found >= 0) {
+                startIndex = found;
+            }
+        }
+        loadLevel(startIndex);
+    }
+
+    private static void loadProgressFromStorage() {
+        String completed = Browser.getStorage(STORAGE_COMPLETED);
+        if (completed != null && !completed.isEmpty()) {
+            for (String id : completed.split(",")) {
+                if (!id.isEmpty()) {
+                    COMPLETED.add(id);
+                }
+            }
+        }
+    }
+
+    private static void saveCompleted() {
+        Browser.setStorage(STORAGE_COMPLETED, String.join(",", COMPLETED));
     }
 
     private static void loadLevel(int index) {
@@ -38,33 +67,48 @@ public final class Main {
         hintsRevealed = 0;
         fullSourceVisible = false;
         Level level = REGISTRY.get(currentIndex);
+        Browser.setStorage(STORAGE_CURRENT, level.id());
+
+        String savedCode = Browser.getStorage(STORAGE_CODE_PREFIX + level.id());
+        String editorContent = (savedCode != null && !savedCode.isEmpty())
+            ? savedCode
+            : level.starterCode();
 
         Browser.setText("levelTitle", level.title());
         Browser.setText("levelIntro", level.intro());
-        Browser.setValue("editor", level.starterCode());
+        Browser.setValue("editor", editorContent);
         Browser.setHtml("metrics", "<p>Press <strong>Run</strong> to simulate the kitchen.</p>");
         Browser.setHtml("eventLog", "<p>No events yet.</p>");
         Browser.setHtml("hintPanel", "");
-        Browser.setClassName("statusBanner", "status-banner status-idle");
-        Browser.setText("statusBanner", "Ready");
+        Browser.setClassName("statusBanner",
+            COMPLETED.contains(level.id()) ? "status-banner status-pass" : "status-banner status-idle");
+        Browser.setText("statusBanner",
+            COMPLETED.contains(level.id()) ? "Already completed — feel free to revisit." : "Ready");
         renderFullSource();
         renderBreadcrumb();
         renderNavButtons();
     }
 
     private static void reset() {
+        Level level = REGISTRY.get(currentIndex);
+        Browser.removeStorage(STORAGE_CODE_PREFIX + level.id());
         loadLevel(currentIndex);
     }
 
     private static void run() {
         Level level = REGISTRY.get(currentIndex);
         String code = Browser.getValue("editor");
+        Browser.setStorage(STORAGE_CODE_PREFIX + level.id(), code);
+
         Outcome outcome = level.run(code);
-        render(outcome, level);
+        render(outcome);
         renderFullSource();
 
         if (outcome.passed()) {
-            COMPLETED.add(level.id());
+            if (!COMPLETED.contains(level.id())) {
+                COMPLETED.add(level.id());
+                saveCompleted();
+            }
             failsSinceLastPass = 0;
             hintsRevealed = 0;
         } else {
@@ -82,19 +126,27 @@ public final class Main {
         if (!isAccessible(index)) {
             return;
         }
+        saveCurrentEditor();
         loadLevel(index);
     }
 
     private static void goToPrevious() {
         if (currentIndex > 0) {
+            saveCurrentEditor();
             loadLevel(currentIndex - 1);
         }
     }
 
     private static void goToNext() {
         if (currentIndex < REGISTRY.size() - 1 && isAccessible(currentIndex + 1)) {
+            saveCurrentEditor();
             loadLevel(currentIndex + 1);
         }
+    }
+
+    private static void saveCurrentEditor() {
+        Level level = REGISTRY.get(currentIndex);
+        Browser.setStorage(STORAGE_CODE_PREFIX + level.id(), Browser.getValue("editor"));
     }
 
     private static boolean isAccessible(int index) {
@@ -109,7 +161,7 @@ public final class Main {
         return true;
     }
 
-    private static void render(Outcome outcome, Level level) {
+    private static void render(Outcome outcome) {
         if (outcome.hasErrors()) {
             renderErrors(outcome);
             return;
