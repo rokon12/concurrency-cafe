@@ -137,6 +137,54 @@ class SimulatorTest {
     }
 
     @Test
+    void stepInstructionAdvancesOneChefAtATime() {
+        Program program = Parser.parse("""
+            Thread.ofVirtual().start(() -> {
+                int x = counter;
+                counter = x + 1;
+            });
+            Thread.ofVirtual().start(() -> {
+                int x = counter;
+                counter = x + 1;
+            });
+            """, INT_LEVEL);
+
+        Simulator sim = new Simulator(program, initial("counter", 41));
+        assertTrue(sim.stepInstruction());
+        assertEquals(1, sim.snapshot().events().size());
+        assertTrue(sim.stepInstruction());
+        assertEquals(2, sim.snapshot().events().size());
+        // Run remaining instructions
+        while (!sim.isFinished()) {
+            sim.stepInstruction();
+        }
+        assertEquals(42, sim.snapshot().finalGlobals().get("counter"));
+    }
+
+    @Test
+    void stepInstructionDetectsDeadlockWhenNoChefCanProgress() {
+        Program program = Parser.parse("""
+            Thread.ofVirtual().start(() -> {
+                synchronized (oven) {
+                    synchronized (fryer) {}
+                }
+            });
+            Thread.ofVirtual().start(() -> {
+                synchronized (fryer) {
+                    synchronized (oven) {}
+                }
+            });
+            """, KITCHEN);
+
+        Simulator sim = new Simulator(program, Map.of());
+        while (!sim.isFinished()) {
+            sim.stepInstruction();
+        }
+        assertNotNull(sim.snapshot().error());
+        assertTrue(sim.snapshot().error().startsWith("Deadlock"));
+    }
+
+    @Test
     void stepRoundAdvancesOneRoundAtATime() {
         Program program = Parser.parse("""
             Thread.ofVirtual().start(() -> {

@@ -145,7 +145,7 @@ public final class Main {
         }
 
         try {
-            activeSimulator.stepRound();
+            activeSimulator.stepInstruction();
         } catch (SimulationException e) {
             activeSimulator = null;
             activeSimulatorCode = null;

@@ -22,6 +22,7 @@ public final class Simulator {
     private final List<String> events = new ArrayList<>();
     private final List<ChefState> chefs = new ArrayList<>();
     private int ticks;
+    private int nextChefIndex;
     private boolean finished;
     private String error;
 
@@ -45,6 +46,43 @@ public final class Simulator {
             // loop
         }
         return snapshot();
+    }
+
+    public boolean stepInstruction() {
+        if (finished) {
+            return false;
+        }
+        if (++ticks > MAX_TICKS) {
+            finish("Simulation exceeded " + MAX_TICKS + " ticks");
+            return false;
+        }
+        int n = chefs.size();
+        for (int tries = 0; tries < n; tries++) {
+            if (nextChefIndex >= n) {
+                nextChefIndex = 0;
+            }
+            ChefState chef = chefs.get(nextChefIndex);
+            nextChefIndex++;
+            if (chef.done()) {
+                continue;
+            }
+            if (step(chef)) {
+                return true;
+            }
+        }
+        boolean anyAlive = false;
+        for (ChefState chef : chefs) {
+            if (!chef.done()) {
+                anyAlive = true;
+                break;
+            }
+        }
+        if (anyAlive) {
+            finish("Deadlock: " + describeDeadlock(chefs));
+        } else {
+            finish(null);
+        }
+        return false;
     }
 
     public boolean stepRound() {
