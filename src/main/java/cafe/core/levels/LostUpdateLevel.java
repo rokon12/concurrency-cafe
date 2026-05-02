@@ -12,7 +12,7 @@ public final class LostUpdateLevel extends AbstractLevel {
     public LostUpdateLevel() {
         super(LevelSpec.builder()
             .id("lost-update")
-            .title("Level 1: Lost Update")
+            .title("Lost Update")
             .chapter("Chapter I · Shared state")
             .lessonClassName("LostUpdateLesson")
             .passingCondition("Counter ends at 43")

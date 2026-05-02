@@ -12,7 +12,7 @@ public final class AtomicCounterLevel extends AbstractLevel {
     public AtomicCounterLevel() {
         super(LevelSpec.builder()
             .id("atomic-counter")
-            .title("Level 2: Atomic Counter")
+            .title("Atomic Counter")
             .chapter("Chapter I · Shared state")
             .lessonClassName("AtomicCounterLesson")
             .passingCondition("Counter ends at 43")

@@ -11,7 +11,7 @@ public final class DeadlockKitchenLevel extends AbstractLevel {
     public DeadlockKitchenLevel() {
         super(LevelSpec.builder()
             .id("deadlock-kitchen")
-            .title("Level 3: Deadlock Kitchen")
+            .title("Deadlock Kitchen")
             .chapter("Chapter II · Locks & coordination")
             .lessonClassName("DeadlockKitchen")
             .passingCondition("Both chefs plate a dish — no deadlock")

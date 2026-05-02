@@ -1,8 +1,10 @@
 package cafe.core;
 
+import cafe.core.levels.AtomicAddLevel;
 import cafe.core.levels.AtomicCounterLevel;
 import cafe.core.levels.DeadlockKitchenLevel;
 import cafe.core.levels.LostUpdateLevel;
+import cafe.core.levels.ReentrantLockLevel;
 
 import java.util.List;
 
@@ -24,6 +26,8 @@ public record LevelRegistry(List<Level> levels) {
         return new LevelRegistry(List.of(
             new LostUpdateLevel(),
             new AtomicCounterLevel(),
+            new AtomicAddLevel(),
+            new ReentrantLockLevel(),
             new DeadlockKitchenLevel()
         ));
     }

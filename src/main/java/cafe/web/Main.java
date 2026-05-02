@@ -750,6 +750,8 @@ public final class Main {
         return switch (level.id()) {
             case "lost-update" -> "You sealed the race.";
             case "atomic-counter" -> "Lock-free, and it works.";
+            case "atomic-add" -> "+5, atomically.";
+            case "reentrant-lock" -> "Lock acquired, released, repeat.";
             case "deadlock-kitchen" -> "Both chefs serve.";
             default -> "Level complete.";
         };
@@ -759,6 +761,8 @@ public final class Main {
         return switch (level.id()) {
             case "lost-update" -> "Synchronizing the read+write makes it atomic — no other chef can sneak between the read and the write.";
             case "atomic-counter" -> "AtomicInteger.incrementAndGet does the read+add+write as a single CAS — no lock, no contention.";
+            case "atomic-add" -> "addAndGet(n) is just incrementAndGet generalized — atomically add anything you want, lock-free.";
+            case "reentrant-lock" -> "ReentrantLock is the explicit cousin of synchronized: lock(), do work, unlock(). In real code wrap unlock in finally.";
             case "deadlock-kitchen" -> "Consistent lock ordering breaks the cycle. Every chef now grabs the oven first, then the fryer.";
             default -> "Bug squashed. On to the next.";
         };
