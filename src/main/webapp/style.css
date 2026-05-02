@@ -612,6 +612,69 @@ code, pre, .mono { font-family: var(--font-mono); font-feature-settings: 'liga' 
   line-height: 1;
   letter-spacing: -0.04em;
   font-variant-numeric: tabular-nums;
+  transition: color 0.2s ease;
+}
+
+.counter-display.pulse {
+  animation: counter-pulse 0.55s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes counter-pulse {
+  0%   { transform: scale(1);    color: var(--accent); }
+  35%  { transform: scale(1.18); color: var(--ok); text-shadow: 0 0 18px color-mix(in oklab, var(--ok) 60%, transparent); }
+  100% { transform: scale(1);    color: var(--accent); text-shadow: none; }
+}
+
+.global-mini.pulse {
+  animation: mini-pulse 0.55s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes mini-pulse {
+  0%   { background: transparent; }
+  35%  { background: color-mix(in oklab, var(--ok) 25%, transparent); border-radius: 4px; }
+  100% { background: transparent; }
+}
+
+.queue-display {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 12px;
+  width: 100%;
+}
+.queue-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--fg-2);
+  letter-spacing: 0.04em;
+}
+.queue-slots {
+  display: flex;
+  gap: 4px;
+}
+.queue-slot {
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--fg-3);
+  background: var(--bg-1);
+  transition: border-color 0.15s, background 0.15s;
+}
+.queue-slot.filled {
+  border-color: var(--accent);
+  background: color-mix(in oklab, var(--accent) 18%, var(--bg-1));
+  color: var(--accent-fg);
+  font-weight: 600;
+}
+.queue-slot.empty::before {
+  content: '·';
+  color: var(--fg-3);
+  opacity: 0.7;
 }
 .counter-target {
   font-family: var(--font-mono);

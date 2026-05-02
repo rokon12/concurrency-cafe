@@ -36,6 +36,9 @@ public final class Main {
     private static String theme = "dark";
     private static boolean devMode;
 
+    /** Last-render values of each int global, used to flash on change. */
+    private static final java.util.HashMap<String, Integer> previousGlobals = new java.util.HashMap<>();
+
     private static Simulator activeSimulator;
     private static String activeSimulatorCode;
     private static int totalTraceSteps;
@@ -124,6 +127,7 @@ public final class Main {
     private static void loadLevel(int index) {
         stopPlay();
         Browser.setActiveLine(0);
+        previousGlobals.clear();
         currentIndex = index;
         failsSinceLastPass = 0;
         hintsRevealed = 0;
@@ -511,39 +515,82 @@ public final class Main {
         StringBuilder sb = new StringBuilder();
         sb.append("<div class=\"counter-stage\">");
 
+        sb.append(renderQueueDisplay(level));
+
         Map.Entry<String, SharedType> primary = primaryDataDeclaration(level);
         if (primary != null) {
             String name = primary.getKey();
             int value = globals.getOrDefault(name, 0);
+            boolean changed = pulseFor(name, value);
             sb.append("<div class=\"counter-label\">")
                 .append(escape(primary.getValue().javaTypeName())).append(' ')
                 .append(escape(name)).append("</div>");
-            sb.append("<div class=\"counter-display\">").append(value).append("</div>");
+            sb.append("<div class=\"counter-display").append(changed ? " pulse" : "").append("\">")
+                .append(value).append("</div>");
             sb.append("<div class=\"counter-target\">target = ")
                 .append(escape(level.passingCondition())).append("</div>");
         } else {
             sb.append("<div class=\"counter-label\">shared resources</div>");
         }
 
-        // Other globals (locks, additional data)
+        // Other globals (locks, additional data, executors)
         StringBuilder mini = new StringBuilder();
         for (var entry : level.sharedDeclarations().entrySet()) {
             String name = entry.getKey();
             if (primary != null && primary.getKey().equals(name)) continue;
             SharedType type = entry.getValue();
-            if (type instanceof SharedType.MonitorType || type instanceof SharedType.LockType) {
+            if (type instanceof SharedType.MonitorType || type instanceof SharedType.LockType
+                || type instanceof SharedType.FixedExecutorType
+                || type instanceof SharedType.VirtualExecutorType
+                || type instanceof SharedType.QueueType) {
                 mini.append("<div class=\"global-mini\">")
                     .append(escape(type.javaTypeName())).append(" <b>")
                     .append(escape(name)).append("</b></div>");
             } else {
                 int v = globals.getOrDefault(name, 0);
-                mini.append("<div class=\"global-mini\">")
+                boolean changed = pulseFor(name, v);
+                mini.append("<div class=\"global-mini").append(changed ? " pulse" : "").append("\">")
                     .append(escape(type.javaTypeName())).append(" <b>")
                     .append(escape(name)).append("</b> = ").append(v).append("</div>");
             }
         }
         sb.append(mini);
         sb.append("</div>");
+        return sb.toString();
+    }
+
+    /**
+     * Returns true if the int global has a different value from the last
+     * render, so the UI can flash it. Updates the cached value.
+     */
+    private static boolean pulseFor(String name, int value) {
+        Integer prev = previousGlobals.put(name, value);
+        return prev != null && prev != value;
+    }
+
+    private static String renderQueueDisplay(Level level) {
+        StringBuilder sb = new StringBuilder();
+        Map<String, List<Integer>> snapshots = activeSimulator != null
+            ? activeSimulator.queueSnapshot()
+            : Map.of();
+        for (var entry : level.sharedDeclarations().entrySet()) {
+            if (!(entry.getValue() instanceof SharedType.QueueType q)) continue;
+            String name = entry.getKey();
+            int cap = q.capacity();
+            List<Integer> contents = snapshots.getOrDefault(name, List.of());
+            sb.append("<div class=\"queue-display\">");
+            sb.append("<div class=\"queue-label\">").append(escape(name))
+                .append(" · ").append(contents.size()).append("/").append(cap).append("</div>");
+            sb.append("<div class=\"queue-slots\">");
+            for (int i = 0; i < cap; i++) {
+                if (i < contents.size()) {
+                    sb.append("<div class=\"queue-slot filled\">").append(contents.get(i)).append("</div>");
+                } else {
+                    sb.append("<div class=\"queue-slot empty\"></div>");
+                }
+            }
+            sb.append("</div></div>");
+        }
         return sb.toString();
     }
 

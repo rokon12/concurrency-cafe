@@ -72,6 +72,15 @@ public final class Simulator {
         return lastStepLine;
     }
 
+    /** Snapshot of every BlockingQueue's current contents (head first). */
+    public Map<String, List<Integer>> queueSnapshot() {
+        Map<String, List<Integer>> result = new LinkedHashMap<>();
+        for (var entry : queues.entrySet()) {
+            result.put(entry.getKey(), List.copyOf(entry.getValue()));
+        }
+        return result;
+    }
+
 
     public record ChefSnapshot(int index, String name, boolean done, String blockedOnLock,
                                String lastEventDetail, Map<String, Integer> locals) {
