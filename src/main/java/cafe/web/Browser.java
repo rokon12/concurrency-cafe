@@ -13,6 +13,11 @@ public final class Browser {
         void run();
     }
 
+    @JSFunctor
+    public interface IntCallback extends JSObject {
+        void run(int value);
+    }
+
     @JSBody(
         params = { "id", "html" },
         script = "document.getElementById(id).innerHTML = html;"
@@ -44,8 +49,28 @@ public final class Browser {
     public static native void setClassName(String id, String className);
 
     @JSBody(
+        params = { "id", "disabled" },
+        script = "document.getElementById(id).disabled = disabled;"
+    )
+    public static native void setDisabled(String id, boolean disabled);
+
+    @JSBody(
         params = { "id", "callback" },
         script = "document.getElementById(id).addEventListener('click', callback);"
     )
     public static native void onClick(String id, Callback callback);
+
+    @JSBody(
+        params = { "containerId", "attribute", "callback" },
+        script =
+            "document.getElementById(containerId).addEventListener('click', function(e) {" +
+            "  var t = e.target;" +
+            "  while (t && t.getAttribute && t.getAttribute(attribute) === null) { t = t.parentElement; }" +
+            "  if (t && t.getAttribute) {" +
+            "    var v = t.getAttribute(attribute);" +
+            "    if (v !== null) callback(parseInt(v, 10));" +
+            "  }" +
+            "});"
+    )
+    public static native void onClickInside(String containerId, String attribute, IntCallback callback);
 }

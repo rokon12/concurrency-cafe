@@ -1,17 +1,22 @@
 package cafe.web;
 
 import cafe.core.Level;
-import cafe.core.LostUpdateLevel;
+import cafe.core.LevelRegistry;
 import cafe.core.Outcome;
 import cafe.core.sim.SimulationResult;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 public final class Main {
 
     private static final int HINT_AFTER_FAILS = 2;
 
-    private static final Level LEVEL = new LostUpdateLevel();
+    private static final LevelRegistry REGISTRY = LevelRegistry.defaultRegistry();
+    private static final Set<String> COMPLETED = new HashSet<>();
+
+    private static int currentIndex;
     private static int failsSinceLastPass;
     private static int hintsRevealed;
     private static boolean fullSourceVisible;
@@ -20,45 +25,91 @@ public final class Main {
         Browser.onClick("runBtn", Main::run);
         Browser.onClick("resetBtn", Main::reset);
         Browser.onClick("showSourceBtn", Main::toggleFullSource);
+        Browser.onClick("prevBtn", Main::goToPrevious);
+        Browser.onClick("nextBtn", Main::goToNext);
+        Browser.onClickInside("breadcrumb", "data-level-index", Main::switchToLevel);
 
-        renderIntro();
+        loadLevel(0);
     }
 
-    private static void renderIntro() {
-        Browser.setText("levelTitle", LEVEL.title());
-        Browser.setText("levelIntro", LEVEL.intro());
-        Browser.setValue("editor", LEVEL.starterCode());
+    private static void loadLevel(int index) {
+        currentIndex = index;
+        failsSinceLastPass = 0;
+        hintsRevealed = 0;
+        fullSourceVisible = false;
+        Level level = REGISTRY.get(currentIndex);
+
+        Browser.setText("levelTitle", level.title());
+        Browser.setText("levelIntro", level.intro());
+        Browser.setValue("editor", level.starterCode());
         Browser.setHtml("metrics", "<p>Press <strong>Run</strong> to simulate the kitchen.</p>");
         Browser.setHtml("eventLog", "<p>No events yet.</p>");
         Browser.setHtml("hintPanel", "");
         Browser.setClassName("statusBanner", "status-banner status-idle");
         Browser.setText("statusBanner", "Ready");
-        fullSourceVisible = false;
         renderFullSource();
+        renderBreadcrumb();
+        renderNavButtons();
     }
 
     private static void reset() {
-        failsSinceLastPass = 0;
-        hintsRevealed = 0;
-        renderIntro();
+        loadLevel(currentIndex);
     }
 
     private static void run() {
+        Level level = REGISTRY.get(currentIndex);
         String code = Browser.getValue("editor");
-        Outcome outcome = LEVEL.run(code);
-        render(outcome);
+        Outcome outcome = level.run(code);
+        render(outcome, level);
         renderFullSource();
 
         if (outcome.passed()) {
+            COMPLETED.add(level.id());
             failsSinceLastPass = 0;
             hintsRevealed = 0;
         } else {
             failsSinceLastPass++;
-            maybeRevealHint();
+            maybeRevealHint(level);
+        }
+        renderBreadcrumb();
+        renderNavButtons();
+    }
+
+    private static void switchToLevel(int index) {
+        if (index == currentIndex) {
+            return;
+        }
+        if (!isAccessible(index)) {
+            return;
+        }
+        loadLevel(index);
+    }
+
+    private static void goToPrevious() {
+        if (currentIndex > 0) {
+            loadLevel(currentIndex - 1);
         }
     }
 
-    private static void render(Outcome outcome) {
+    private static void goToNext() {
+        if (currentIndex < REGISTRY.size() - 1 && isAccessible(currentIndex + 1)) {
+            loadLevel(currentIndex + 1);
+        }
+    }
+
+    private static boolean isAccessible(int index) {
+        if (index <= currentIndex) {
+            return true;
+        }
+        for (int i = 0; i < index; i++) {
+            if (!COMPLETED.contains(REGISTRY.get(i).id())) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static void render(Outcome outcome, Level level) {
         if (outcome.hasErrors()) {
             renderErrors(outcome);
             return;
@@ -83,7 +134,10 @@ public final class Main {
 
         if (outcome.passed()) {
             Browser.setClassName("statusBanner", "status-banner status-pass");
-            Browser.setText("statusBanner", "Level complete");
+            String banner = currentIndex < REGISTRY.size() - 1
+                ? "Level complete — click Next to continue"
+                : "Level complete — you've cleared the kitchen";
+            Browser.setText("statusBanner", banner);
         } else {
             Browser.setClassName("statusBanner", "status-banner status-fail");
             Browser.setText("statusBanner", "Bug still there. Keep editing.");
@@ -116,12 +170,55 @@ public final class Main {
         }
         Browser.setText("showSourceBtn", "Hide full Java source");
         Browser.setClassName("fullSourcePanel", "panel");
+        Level level = REGISTRY.get(currentIndex);
         String code = Browser.getValue("editor");
-        Browser.setText("fullSource", LEVEL.fullSourceWith(code));
+        Browser.setText("fullSource", level.fullSourceWith(code));
     }
 
-    private static void maybeRevealHint() {
-        List<String> hints = LEVEL.hints();
+    private static void renderBreadcrumb() {
+        List<Level> levels = REGISTRY.levels();
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < levels.size(); i++) {
+            Level l = levels.get(i);
+            boolean done = COMPLETED.contains(l.id());
+            boolean current = i == currentIndex;
+            boolean accessible = isAccessible(i);
+
+            String classes = "level-tab";
+            if (current) classes += " current";
+            if (done) classes += " done";
+            if (!accessible) classes += " locked";
+
+            sb.append("<button class=\"").append(classes).append("\"")
+                .append(" data-level-index=\"").append(i).append("\"")
+                .append(accessible ? "" : " disabled")
+                .append(">");
+            sb.append("<span class=\"level-num\">").append(i + 1).append("</span>");
+            sb.append("<span class=\"level-name\">").append(escape(stripPrefix(l.title()))).append("</span>");
+            if (done) {
+                sb.append("<span class=\"level-mark\">✓</span>");
+            } else if (!accessible) {
+                sb.append("<span class=\"level-mark\">🔒</span>");
+            }
+            sb.append("</button>");
+        }
+        Browser.setHtml("breadcrumb", sb.toString());
+    }
+
+    private static void renderNavButtons() {
+        Browser.setDisabled("prevBtn", currentIndex == 0);
+        boolean canGoNext = currentIndex < REGISTRY.size() - 1
+            && isAccessible(currentIndex + 1);
+        Browser.setDisabled("nextBtn", !canGoNext);
+    }
+
+    private static String stripPrefix(String title) {
+        int colon = title.indexOf(':');
+        return colon >= 0 ? title.substring(colon + 1).trim() : title;
+    }
+
+    private static void maybeRevealHint(Level level) {
+        List<String> hints = level.hints();
         if (failsSinceLastPass < HINT_AFTER_FAILS) {
             return;
         }
