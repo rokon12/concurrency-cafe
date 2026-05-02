@@ -27,6 +27,8 @@ public interface Level {
 
     String fullSourceWith(String userCode);
 
+    String lessonClassName();
+
     Outcome validate(SimulationResult sim);
 
     default Map<String, Integer> initialGlobals() {

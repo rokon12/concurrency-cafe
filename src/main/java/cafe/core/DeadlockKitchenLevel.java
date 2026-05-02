@@ -73,6 +73,11 @@ public final class DeadlockKitchenLevel implements Level {
     }
 
     @Override
+    public String lessonClassName() {
+        return "DeadlockKitchen";
+    }
+
+    @Override
     public String fullSourceWith(String userCode) {
         StringBuilder sb = new StringBuilder();
         sb.append("public class DeadlockKitchen {\n");

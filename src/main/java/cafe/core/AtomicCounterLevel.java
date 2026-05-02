@@ -67,6 +67,11 @@ public final class AtomicCounterLevel implements Level {
     }
 
     @Override
+    public String lessonClassName() {
+        return "AtomicCounterLesson";
+    }
+
+    @Override
     public String fullSourceWith(String userCode) {
         StringBuilder sb = new StringBuilder();
         sb.append("import java.util.concurrent.atomic.AtomicInteger;\n\n");

@@ -37,6 +37,7 @@ public final class Main {
         Browser.onClick("resetBtn", Main::reset);
         Browser.onClick("resetProgressBtn", Main::resetAllProgress);
         Browser.onClick("showSourceBtn", Main::toggleFullSource);
+        Browser.onClick("downloadBtn", Main::downloadJava);
         Browser.onClick("prevBtn", Main::goToPrevious);
         Browser.onClick("nextBtn", Main::goToNext);
         Browser.onClickInside("breadcrumb", "data-level-index", Main::switchToLevel);
@@ -292,6 +293,12 @@ public final class Main {
         Browser.setHtml("eventLog", "<p>No events. Fix the error above and try again.</p>");
         Browser.setClassName("statusBanner", "status-banner status-fail");
         Browser.setText("statusBanner", outcome.summary());
+    }
+
+    private static void downloadJava() {
+        Level level = REGISTRY.get(currentIndex);
+        String code = Browser.getValue("editor");
+        Browser.downloadFile(level.lessonClassName() + ".java", level.fullSourceWith(code));
     }
 
     private static void toggleFullSource() {

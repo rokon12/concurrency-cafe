@@ -70,6 +70,11 @@ public final class LostUpdateLevel implements Level {
     }
 
     @Override
+    public String lessonClassName() {
+        return "LostUpdateLesson";
+    }
+
+    @Override
     public String fullSourceWith(String userCode) {
         StringBuilder sb = new StringBuilder();
         sb.append("public class LostUpdateLesson {\n");

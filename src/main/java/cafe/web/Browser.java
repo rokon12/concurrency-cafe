@@ -97,6 +97,19 @@ public final class Browser {
     public static native boolean confirm(String message);
 
     @JSBody(
+        params = { "filename", "content" },
+        script =
+            "var blob = new Blob([content], {type: 'text/x-java-source;charset=utf-8'});" +
+            "var url = URL.createObjectURL(blob);" +
+            "var a = document.createElement('a');" +
+            "a.href = url; a.download = filename;" +
+            "document.body.appendChild(a); a.click();" +
+            "document.body.removeChild(a);" +
+            "setTimeout(function(){ URL.revokeObjectURL(url); }, 0);"
+    )
+    public static native void downloadFile(String filename, String content);
+
+    @JSBody(
         params = { "containerId", "attribute", "callback" },
         script =
             "document.getElementById(containerId).addEventListener('click', function(e) {" +
