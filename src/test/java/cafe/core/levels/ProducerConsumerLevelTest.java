@@ -11,45 +11,69 @@ class ProducerConsumerLevelTest {
     private final ProducerConsumerLevel level = new ProducerConsumerLevel();
 
     @Test
-    void starterCodePassesBecauseItIsTheCanonicalSolution() {
+    void starterDeadlocksOnTheMissingFifthPut() {
         Outcome outcome = level.run(level.starterCode());
+
+        assertFalse(outcome.passed(), "starter ships with a bug; should not pass");
+        assertTrue(outcome.summary().toLowerCase().contains("deadlock")
+                || outcome.summary().toLowerCase().contains("halt"),
+            "expected deadlock when consumer waits on missing item, got: " + outcome.summary());
+    }
+
+    @Test
+    void addingTheMissingPutPasses() {
+        Outcome outcome = level.run("""
+            Thread producer = Thread.ofVirtual().start(() -> {
+                queue.put(1);
+                queue.put(2);
+                queue.put(3);
+                queue.put(4);
+                queue.put(5);
+            });
+
+            Thread consumer = Thread.ofVirtual().start(() -> {
+                int x = queue.take();
+                totalReceived = totalReceived + x;
+                x = queue.take();
+                totalReceived = totalReceived + x;
+                x = queue.take();
+                totalReceived = totalReceived + x;
+                x = queue.take();
+                totalReceived = totalReceived + x;
+                x = queue.take();
+                totalReceived = totalReceived + x;
+            });
+            """);
 
         assertTrue(outcome.passed(), outcome.summary());
     }
 
     @Test
-    void consumerWithoutTakingFailsToReachTotal() {
+    void droppingTheLastTakeAlsoPassesIfTotalsMatch() {
+        // Removing the fifth take avoids the deadlock, but the total only
+        // reaches 10 — the validator catches the wrong sum.
         Outcome outcome = level.run("""
-            Thread.ofVirtual().start(() -> {
-                queue.put(1);
-                queue.put(2);
-                queue.put(3);
-            });
-            Thread.ofVirtual().start(() -> {
-                int x = queue.take();
-                totalReceived = totalReceived + x;
-            });
-            """);
-
-        assertFalse(outcome.passed());
-    }
-
-    @Test
-    void producerWithoutConsumerDeadlocksWhenQueueFills() {
-        Outcome outcome = level.run("""
-            Thread.ofVirtual().start(() -> {
+            Thread producer = Thread.ofVirtual().start(() -> {
                 queue.put(1);
                 queue.put(2);
                 queue.put(3);
                 queue.put(4);
             });
+
+            Thread consumer = Thread.ofVirtual().start(() -> {
+                int x = queue.take();
+                totalReceived = totalReceived + x;
+                x = queue.take();
+                totalReceived = totalReceived + x;
+                x = queue.take();
+                totalReceived = totalReceived + x;
+                x = queue.take();
+                totalReceived = totalReceived + x;
+            });
             """);
 
         assertFalse(outcome.passed());
-        assertTrue(outcome.summary().toLowerCase().contains("deadlock")
-                || outcome.summary().toLowerCase().contains("halt"),
-            "expected halt/deadlock when single producer fills queue past capacity, got: "
-                + outcome.summary());
+        assertTrue(outcome.summary().contains("expected 15"));
     }
 
     @Test

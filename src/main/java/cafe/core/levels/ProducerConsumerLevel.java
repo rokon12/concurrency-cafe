@@ -15,25 +15,26 @@ public final class ProducerConsumerLevel extends AbstractLevel {
             .title("Producer / Consumer")
             .chapter("Chapter II · Locks & coordination")
             .lessonClassName("ProducerConsumerLesson")
-            .passingCondition("Total received equals 15 (1+2+3+4+5)")
+            .passingCondition("Total received equals 15 (orders 1..5)")
             .declare("queue", new SharedType.QueueType(3))
             .declare("totalReceived", new SharedType.IntType(0))
             .intro("""
-                A back-of-house queue with capacity 3. The producer puts orders 1..5,
-                the consumer takes them and sums into totalReceived. The queue is
-                smaller than the order count, so put blocks when full and take blocks
-                when empty — that's the cooperation pattern.
+                Five orders should flow from the producer into the queue and out
+                through the consumer, summing to 15. Run the starter and watch the
+                kitchen freeze. queue.take() blocks INDEFINITELY when the queue is
+                empty — if the producer never sends, the consumer waits forever.
+                Find what's missing.
                 """)
             .starterCode("""
-                // queue is an ArrayBlockingQueue<Integer>(3). put blocks if full;
-                // take blocks if empty. Move all 5 items through to totalReceived.
+                // Five orders (1..5) should pass through the queue. Target: 15.
+                // The kitchen freezes — there's an order the producer never sends.
 
                 Thread producer = Thread.ofVirtual().start(() -> {
                     queue.put(1);
                     queue.put(2);
                     queue.put(3);
                     queue.put(4);
-                    queue.put(5);
+                    // The fifth order never goes out.
                 });
 
                 Thread consumer = Thread.ofVirtual().start(() -> {
@@ -49,9 +50,9 @@ public final class ProducerConsumerLevel extends AbstractLevel {
                     totalReceived = totalReceived + x;
                 });
                 """)
-            .hint("BlockingQueue.put waits when the queue is full; BlockingQueue.take waits when the queue is empty.")
-            .hint("The queue holds at most 3 — the producer parks until the consumer makes room. The simulator handles the parking automatically.")
-            .hint("Target: 1 + 2 + 3 + 4 + 5 = 15. Take all five items into totalReceived.")
+            .hint("queue.take() returns nothing while the queue is empty — the consumer parks forever waiting for the fifth order.")
+            .hint("Count the producer's put calls, then count the consumer's takes. They have to match.")
+            .hint("In real Java you'd guard against this with a sentinel value, queue.poll(timeout, ...), or a try/finally that signals completion. Our DSL keeps it simple — just match the counts.")
             .resultPrintln("\"Total received: \" + totalReceived")
             .build());
     }
