@@ -1,5 +1,24 @@
 # Concurrency Café — Roadmap
 
+## Deploying to GitHub Pages
+
+A workflow at `.github/workflows/deploy-pages.yml` builds the WAR, extracts
+its static content (`index.html`, `style.css`, `js/cafe.js`), strips the
+servlet plumbing (`META-INF/`, `WEB-INF/`), and publishes via the official
+GitHub Pages action.
+
+**One-time setup:**
+
+1. Push this repo to GitHub (`git push -u origin main`).
+2. In the repo: **Settings → Pages → Source = "GitHub Actions"**.
+3. Push to `main` (or hit *Run workflow* manually) — the workflow runs and
+   the URL appears under the deploy step (`https://<user>.github.io/<repo>/`).
+
+The CodeMirror editor loads via the jsdelivr / esm.sh CDN, so the deployed
+site needs internet at runtime (until we self-host the bundle — backlog item).
+
+
+
 A TeaVM-compiled, Java-as-DSL teaching game for concurrency hazards.
 Editor accepts a strict subset of Java 21+ syntax with CodeMirror highlighting;
 round-robin deterministic simulator surfaces races, deadlocks, queue cooperation,
