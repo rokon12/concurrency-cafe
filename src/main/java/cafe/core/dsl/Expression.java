@@ -10,4 +10,7 @@ public sealed interface Expression {
 
     record BinOp(String op, Expression left, Expression right) implements Expression {
     }
+
+    record AtomicGet(String name) implements Expression {
+    }
 }

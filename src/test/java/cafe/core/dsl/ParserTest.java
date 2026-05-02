@@ -249,6 +249,45 @@ class ParserTest {
     }
 
     @Test
+    void atomicGetInExpressionCompilesToRead() {
+        Program program = Parser.parse("""
+            Thread.ofVirtual().start(() -> {
+                int x = counter.get();
+            });
+            """, ATOMIC_LEVEL);
+
+        var body = program.chefs().get(0).instructions();
+        assertEquals(1, body.size());
+        Instruction.Read r = assertInstanceOf(Instruction.Read.class, body.get(0));
+        assertEquals("counter", r.globalName());
+    }
+
+    @Test
+    void atomicGetInsideArithmeticLiftsAndComputes() {
+        Program program = Parser.parse("""
+            Thread.ofVirtual().start(() -> {
+                int x = counter.get() + 1;
+            });
+            """, ATOMIC_LEVEL);
+
+        var body = program.chefs().get(0).instructions();
+        assertEquals(2, body.size());
+        assertInstanceOf(Instruction.Read.class, body.get(0));
+        assertInstanceOf(Instruction.LocalSet.class, body.get(1));
+    }
+
+    @Test
+    void getOnIntIsRejectedWithHelpfulError() {
+        ParseException e = assertThrows(ParseException.class, () -> Parser.parse("""
+            Thread.ofVirtual().start(() -> {
+                int x = counter.get();
+            });
+            """, INT_LEVEL));
+        assertTrue(e.getMessage().contains("int"));
+        assertTrue(e.getMessage().contains("AtomicInteger"));
+    }
+
+    @Test
     void atomicSetCompilesToWrite() {
         Program program = Parser.parse("""
             Thread.ofVirtual().start(() -> {

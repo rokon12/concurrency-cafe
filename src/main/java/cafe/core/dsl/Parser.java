@@ -205,6 +205,8 @@ public final class Parser {
         if (expr instanceof Expression.Var v && declarations.containsKey(v.name())) {
             requireReadable(v.name(), nameTok);
             out.add(new Instruction.Read(name, v.name(), intTok.line()));
+        } else if (expr instanceof Expression.AtomicGet ag) {
+            out.add(new Instruction.Read(name, ag.name(), intTok.line()));
         } else {
             int line = intTok.line();
             Expression rewritten = liftGlobalReads(expr, out, line);
@@ -458,6 +460,27 @@ public final class Parser {
         }
         if (tok.kind() == TokenKind.WORD) {
             advance();
+            if (pos < tokens.size() && isSymbol(peek(), ".")) {
+                advance();
+                Token methodTok = expectWord("a method name");
+                expectSymbol("(");
+                expectSymbol(")");
+                String name = tok.text();
+                String method = methodTok.text();
+                if (!method.equals("get")) {
+                    throw error(methodTok,
+                        "only '.get()' is supported inside expressions; got '." + method + "()'");
+                }
+                SharedType type = declarations.get(name);
+                if (type == null) {
+                    throw error(tok, "'" + name + "' is not a known shared variable");
+                }
+                if (!(type instanceof SharedType.AtomicIntegerType)) {
+                    throw error(tok, "'" + name + "' is " + type.description()
+                        + " — '.get()' is only valid on AtomicInteger");
+                }
+                return new Expression.AtomicGet(name);
+            }
             return new Expression.Var(tok.text());
         }
         if (isSymbol(tok, "(")) {
@@ -478,6 +501,11 @@ public final class Parser {
                 return new Expression.Var(temp);
             }
             return v;
+        }
+        if (expr instanceof Expression.AtomicGet ag) {
+            String temp = freshTemp();
+            out.add(new Instruction.Read(temp, ag.name(), line));
+            return new Expression.Var(temp);
         }
         if (expr instanceof Expression.BinOp bin) {
             Expression left = liftGlobalReads(bin.left(), out, line);
