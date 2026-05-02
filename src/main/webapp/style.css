@@ -147,6 +147,21 @@ code, pre, .mono { font-family: var(--font-mono); font-feature-settings: 'liga' 
 }
 .topbar .ghost-btn:hover { background: var(--bg-2); color: var(--fg-0); }
 
+.dev-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 3px;
+  background: var(--err);
+  color: #fff;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  user-select: none;
+}
+.dev-badge.hidden { display: none; }
+
 /* ---------- Buttons ---------- */
 .btn {
   display: inline-flex;

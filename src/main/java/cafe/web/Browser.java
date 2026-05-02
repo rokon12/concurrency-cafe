@@ -52,6 +52,18 @@ public final class Browser {
     public static native void setActiveLine(int line);
 
     @JSBody(
+        params = { "callback" },
+        script =
+            "document.addEventListener('keydown', function(e) {" +
+            "  if (e.shiftKey && (e.metaKey || e.ctrlKey) && (e.key === 'd' || e.key === 'D')) {" +
+            "    e.preventDefault();" +
+            "    callback();" +
+            "  }" +
+            "});"
+    )
+    public static native void onDevShortcut(Callback callback);
+
+    @JSBody(
         params = { "id", "className" },
         script = "document.getElementById(id).className = className;"
     )

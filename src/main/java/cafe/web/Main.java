@@ -22,6 +22,7 @@ public final class Main {
     private static final String STORAGE_COMPLETED = "cc.completed";
     private static final String STORAGE_CURRENT = "cc.current";
     private static final String STORAGE_THEME = "cc.theme";
+    private static final String STORAGE_DEV = "cc.dev";
     private static final String STORAGE_CODE_PREFIX = "cc.code.";
 
     private static final LevelRegistry REGISTRY = LevelRegistry.defaultRegistry();
@@ -33,6 +34,7 @@ public final class Main {
     private static boolean fullSourceVisible;
     private static String activeTab = "viz";
     private static String theme = "dark";
+    private static boolean devMode;
 
     private static Simulator activeSimulator;
     private static String activeSimulatorCode;
@@ -52,6 +54,7 @@ public final class Main {
         Browser.onClick("prevBtn", Main::goToPrevious);
         Browser.onClick("nextBtn", Main::goToNext);
         Browser.onClick("themeBtn", Main::toggleTheme);
+        Browser.onDevShortcut(Main::toggleDevMode);
         Browser.onClick("overlayCloseBtn", Main::closeOverlay);
         Browser.onClick("overlayNextBtn", Main::overlayNext);
         Browser.onClickInside("breadcrumb", "data-level-index", Main::switchToLevel);
@@ -87,6 +90,20 @@ public final class Main {
         if (savedTheme != null && (savedTheme.equals("dark") || savedTheme.equals("light"))) {
             theme = savedTheme;
         }
+        devMode = "1".equals(Browser.getStorage(STORAGE_DEV));
+        renderDevBadge();
+    }
+
+    private static void toggleDevMode() {
+        devMode = !devMode;
+        Browser.setStorage(STORAGE_DEV, devMode ? "1" : "");
+        renderDevBadge();
+        renderBreadcrumb();
+        renderNavButtons();
+    }
+
+    private static void renderDevBadge() {
+        Browser.setClassName("devBadge", devMode ? "dev-badge" : "dev-badge hidden");
     }
 
     private static void saveCompleted() {
@@ -341,6 +358,9 @@ public final class Main {
     }
 
     private static boolean isAccessible(int index) {
+        if (devMode) {
+            return true;
+        }
         if (index <= currentIndex) {
             return true;
         }
