@@ -1,0 +1,68 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Concurrency Café</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="js/cafe.js"></script>
+  </head>
+
+  <body onload="main()">
+    <main class="page">
+      <header>
+        <h1>Concurrency Café</h1>
+        <p id="levelTitle" class="subtitle"></p>
+      </header>
+
+      <section class="panel">
+        <p id="levelIntro" class="intro"></p>
+        <div id="statusBanner" class="status-banner status-idle">Ready</div>
+      </section>
+
+      <section class="panel">
+        <h2><label for="editor">Your code</label></h2>
+        <p class="hint-line">Each <code>Thread.ofVirtual().start(() -&gt; { ... })</code> is one chef. This level pre-declares <code>int counter = 41;</code> and <code>Object counterLock = new Object();</code>. Click <em>Show full Java source</em> to see the wrapping class.</p>
+        <textarea id="editor" spellcheck="false" autocomplete="off"></textarea>
+        <div class="controls">
+          <button id="runBtn">Run</button>
+          <button id="resetBtn" class="secondary">Reset to starter</button>
+          <button id="showSourceBtn" class="secondary">Show full Java source</button>
+        </div>
+      </section>
+
+      <section id="fullSourcePanel" class="panel hidden">
+        <h2>Full Java source</h2>
+        <p class="hint-line">This is what your code looks like inside a runnable Java class. Copy it into a <code>.java</code> file and it compiles on Java 21+.</p>
+        <pre><code id="fullSource"></code></pre>
+      </section>
+
+      <section class="panel">
+        <h2>Result</h2>
+        <div id="metrics"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Kitchen Event Log</h2>
+        <div id="eventLog"></div>
+      </section>
+
+      <section class="panel" id="hintWrap">
+        <div id="hintPanel"></div>
+      </section>
+
+      <section class="panel reference">
+        <h2>Java reference</h2>
+        <p class="hint-line">The shared variables for this level are typed. Operations must match the declared type — the parser will tell you if you mismatch.</p>
+        <ul>
+          <li><code>Thread.ofVirtual().start(() -&gt; { ... });</code> — start a virtual thread chef</li>
+          <li><code>Thread.ofPlatform().start(() -&gt; { ... });</code> — start a platform thread chef</li>
+          <li><strong>int</strong>: <code>int x = v;</code>, <code>v = expr;</code>, <code>v++</code>, <code>v += n</code></li>
+          <li><strong>AtomicInteger</strong>: <code>v.incrementAndGet();</code>, <code>v.set(n);</code></li>
+          <li><strong>Object monitor</strong>: <code>synchronized (m) { ... }</code></li>
+          <li><strong>ReentrantLock</strong>: <code>l.lock();</code> / <code>l.unlock();</code></li>
+          <li><code>System.out.println("...");</code> — emit a log line</li>
+        </ul>
+      </section>
+    </main>
+  </body>
+</html>

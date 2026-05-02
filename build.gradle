@@ -1,0 +1,37 @@
+plugins {
+    id 'java'
+    id 'war'
+    id 'org.teavm' version '0.13.1'
+}
+
+group = 'com.bazlur'
+version = '1.0-SNAPSHOT'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation teavm.libs.jsoApis
+
+    testImplementation platform('org.junit:junit-bom:6.0.0')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+teavm {
+    all {
+        mainClass = 'cafe.web.Main'
+    }
+
+    js {
+        addedToWebApp = true
+        targetFileName = 'cafe.js'
+        sourceMap = true
+        obfuscated = false
+    }
+}
+
+test {
+    useJUnitPlatform()
+}
