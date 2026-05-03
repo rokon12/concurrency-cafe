@@ -7,7 +7,8 @@ import java.util.Map;
 public record SimulationResult(
     List<String> events,
     Map<String, Integer> finalGlobals,
-    String error
+    String error,
+    int elapsedMillis
 ) {
 
     public SimulationResult {

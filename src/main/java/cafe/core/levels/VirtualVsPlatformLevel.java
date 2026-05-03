@@ -7,62 +7,96 @@ import cafe.core.sim.SimulationResult;
 public final class VirtualVsPlatformLevel extends AbstractLevel {
 
     private static final int EXPECTED_SUM = 15;
+    private static final int DEADLINE_MILLIS = 900;
     private static final String TOTAL = "totalReceived";
 
     public VirtualVsPlatformLevel() {
         super(LevelSpec.builder()
-            .id("virtual-vs-platform")
-            .title("Virtual vs Platform")
-            .chapter("Chapter III · Modern Java")
-            .lessonClassName("VirtualVsPlatformLesson")
-            .passingCondition("Total received equals 15")
-            .declare("queue", new SharedType.QueueType(2))
-            .declare("totalReceived", new SharedType.IntType(0))
-            .declare("fixedPool", new SharedType.FixedExecutorType(1))
-            .declare("virtualPool", new SharedType.VirtualExecutorType())
-            .intro("""
-                Producer/consumer cooperation, but the kitchen runs tasks through a
-                fixed thread pool of size 1. fixedPool only has one slot — the
-                producer takes it, fills the queue, then parks waiting for room.
-                The consumer can never start because the slot is occupied. Whole
-                kitchen freezes.
+                .id("virtual-vs-platform")
+                .title("Virtual vs Platform Threads")
+                .chapter("Chapter III · Modern Java")
+                .lessonClassName("VirtualVsPlatformLesson")
+                .passingCondition("Total received equals 15 before the deadline")
 
-                Java 21 ships another executor — virtualPool, backed by virtual
-                threads — that doesn't bind tasks to OS threads. Submit there
-                instead.
+                .declare("receipts", new SharedType.QueueType(5))
+                .declare("totalReceived", new SharedType.IntType(0))
+                .declare("platformPool", new SharedType.FixedExecutorType(2))
+                .declare("virtualPool", new SharedType.VirtualExecutorType())
+
+                .intro("""
+                The kitchen has five slow calls to make. Each one waits for
+                half a second, like a network call, database query, or remote
+                service request.
+
+                platformPool has only two platform threads. If all five slow
+                calls run there, only two can sleep at a time. The work finishes
+                in waves: two calls, two calls, one call.
+
+                virtualPool starts one virtual thread per task. All five calls
+                can wait at the same time, because sleeping virtual threads do
+                not monopolize scarce platform-pool workers.
+
+                Move the slow blocking tasks from platformPool to virtualPool.
                 """)
-            .starterCode("""
-                // fixedPool: Executors.newFixedThreadPool(1) — one slot.
-                // virtualPool: Executors.newVirtualThreadPerTaskExecutor() — unbounded.
+
+                .starterCode("""
+                // platformPool: fixed pool with 2 platform workers.
+                // virtualPool: one virtual thread per submitted task.
                 //
-                // Run as-is and watch fixedPool starve. Then move the submits.
+                // Each slow call waits 500 ms, then returns a number.
+                //
+                // Run as-is: platformPool can only run two sleepers at once.
+                // Fix: move the five slow calls to virtualPool.
 
-                fixedPool.submit(() -> {
-                    queue.put(1);
-                    queue.put(2);
-                    queue.put(3);
-                    queue.put(4);
-                    queue.put(5);
+                platformPool.submit(() -> {
+                    Thread.sleep(500);
+                    receipts.put(1);
                 });
 
-                fixedPool.submit(() -> {
-                    int x = queue.take();
+                platformPool.submit(() -> {
+                    Thread.sleep(500);
+                    receipts.put(2);
+                });
+
+                platformPool.submit(() -> {
+                    Thread.sleep(500);
+                    receipts.put(3);
+                });
+
+                platformPool.submit(() -> {
+                    Thread.sleep(500);
+                    receipts.put(4);
+                });
+
+                platformPool.submit(() -> {
+                    Thread.sleep(500);
+                    receipts.put(5);
+                });
+
+                platformPool.submit(() -> {
+                    int x = receipts.take();
                     totalReceived = totalReceived + x;
-                    x = queue.take();
+
+                    x = receipts.take();
                     totalReceived = totalReceived + x;
-                    x = queue.take();
+
+                    x = receipts.take();
                     totalReceived = totalReceived + x;
-                    x = queue.take();
+
+                    x = receipts.take();
                     totalReceived = totalReceived + x;
-                    x = queue.take();
+
+                    x = receipts.take();
                     totalReceived = totalReceived + x;
                 });
                 """)
-            .hint("A fixed pool task holds its slot for the entire body — even when it's parked waiting on a queue. Pool=1 means no concurrent submits.")
-            .hint("Switch fixedPool.submit(...) to virtualPool.submit(...) — at least for one of the two tasks. Virtual threads park without holding an OS thread.")
-            .hint("In production Java this is the actual fix: replace `Executors.newFixedThreadPool(N)` with `Executors.newVirtualThreadPerTaskExecutor()` for I/O-heavy work.")
-            .resultPrintln("\"Total received: \" + totalReceived")
-            .build());
+
+                .hint("The five tasks that call Thread.sleep(500) are the blocking tasks. Those are the ones that should move to virtualPool.")
+                .hint("Leave the collector on platformPool. The collector is not the problem; the sleepers are.")
+                .hint("Virtual threads help when many tasks are waiting. They do not make CPU-heavy code faster.")
+
+                .resultPrintln("\"Total received: \" + totalReceived")
+                .build());
     }
 
     @Override
@@ -70,10 +104,26 @@ public final class VirtualVsPlatformLevel extends AbstractLevel {
         if (sim.hasError()) {
             return haltedOnError(sim);
         }
+
         int total = sim.finalGlobals().getOrDefault(TOTAL, 0);
-        if (total == EXPECTED_SUM) {
-            return pass("Total received: " + total + ". Tasks ran without competing for an OS thread.", sim);
+
+        // Replace elapsedMillis() with whatever timing API your simulator exposes.
+        long elapsed = sim.elapsedMillis();
+
+        if (total == EXPECTED_SUM && elapsed <= DEADLINE_MILLIS) {
+            return pass(
+                    "Total received: " + total + " in " + elapsed + " ms. The blocking work ran concurrently on virtual threads.",
+                    sim
+            );
         }
+
+        if (total == EXPECTED_SUM) {
+            return fail(
+                    "Total received: " + total + ", but it took " + elapsed + " ms. The slow blocking tasks still ran in waves on the platform pool.",
+                    sim
+            );
+        }
+
         return fail("Total received: " + total + ", expected " + EXPECTED_SUM + ".", sim);
     }
 }

@@ -11,37 +11,49 @@ class VirtualVsPlatformLevelTest {
     private final VirtualVsPlatformLevel level = new VirtualVsPlatformLevel();
 
     @Test
-    void starterDeadlocksOnFixedPoolOfOne() {
+    void starterMissesTheDeadlineOnPlatformPool() {
         Outcome outcome = level.run(level.starterCode());
 
-        assertFalse(outcome.passed());
-        assertTrue(outcome.summary().toLowerCase().contains("deadlock")
-                || outcome.summary().toLowerCase().contains("halt"),
-            "expected deadlock when both submits go to fixedPool of size 1, got: "
-                + outcome.summary());
+        assertFalse(outcome.passed(), "starter funnels every sleeper through pool=2");
+        assertTrue(outcome.summary().toLowerCase().contains("ms")
+                || outcome.summary().contains("expected"),
+            "expected deadline-miss summary, got: " + outcome.summary());
     }
 
     @Test
-    void switchingBothToVirtualPoolPasses() {
+    void movingSleepersToVirtualPoolPasses() {
         Outcome outcome = level.run("""
             virtualPool.submit(() -> {
-                queue.put(1);
-                queue.put(2);
-                queue.put(3);
-                queue.put(4);
-                queue.put(5);
+                Thread.sleep(500);
+                receipts.put(1);
+            });
+            virtualPool.submit(() -> {
+                Thread.sleep(500);
+                receipts.put(2);
+            });
+            virtualPool.submit(() -> {
+                Thread.sleep(500);
+                receipts.put(3);
+            });
+            virtualPool.submit(() -> {
+                Thread.sleep(500);
+                receipts.put(4);
+            });
+            virtualPool.submit(() -> {
+                Thread.sleep(500);
+                receipts.put(5);
             });
 
-            virtualPool.submit(() -> {
-                int x = queue.take();
+            platformPool.submit(() -> {
+                int x = receipts.take();
                 totalReceived = totalReceived + x;
-                x = queue.take();
+                x = receipts.take();
                 totalReceived = totalReceived + x;
-                x = queue.take();
+                x = receipts.take();
                 totalReceived = totalReceived + x;
-                x = queue.take();
+                x = receipts.take();
                 totalReceived = totalReceived + x;
-                x = queue.take();
+                x = receipts.take();
                 totalReceived = totalReceived + x;
             });
             """);
@@ -50,28 +62,24 @@ class VirtualVsPlatformLevelTest {
     }
 
     @Test
-    void mixedFixedAndVirtualPoolAlsoPasses() {
-        // Producer holds the lone fixedPool slot and parks on full;
-        // consumer is on virtualPool, unbounded, so it can drain freely.
+    void allOnVirtualPoolAlsoPasses() {
         Outcome outcome = level.run("""
-            fixedPool.submit(() -> {
-                queue.put(1);
-                queue.put(2);
-                queue.put(3);
-                queue.put(4);
-                queue.put(5);
-            });
+            virtualPool.submit(() -> { Thread.sleep(500); receipts.put(1); });
+            virtualPool.submit(() -> { Thread.sleep(500); receipts.put(2); });
+            virtualPool.submit(() -> { Thread.sleep(500); receipts.put(3); });
+            virtualPool.submit(() -> { Thread.sleep(500); receipts.put(4); });
+            virtualPool.submit(() -> { Thread.sleep(500); receipts.put(5); });
 
             virtualPool.submit(() -> {
-                int x = queue.take();
+                int x = receipts.take();
                 totalReceived = totalReceived + x;
-                x = queue.take();
+                x = receipts.take();
                 totalReceived = totalReceived + x;
-                x = queue.take();
+                x = receipts.take();
                 totalReceived = totalReceived + x;
-                x = queue.take();
+                x = receipts.take();
                 totalReceived = totalReceived + x;
-                x = queue.take();
+                x = receipts.take();
                 totalReceived = totalReceived + x;
             });
             """);
@@ -80,11 +88,11 @@ class VirtualVsPlatformLevelTest {
     }
 
     @Test
-    void fullSourceContainsBothExecutorsAndImports() {
+    void fullSourceContainsBothPoolsAndImports() {
         String full = level.fullSourceWith(level.starterCode());
         assertTrue(full.contains("import java.util.concurrent.ExecutorService"));
         assertTrue(full.contains("import java.util.concurrent.Executors"));
-        assertTrue(full.contains("Executors.newFixedThreadPool(1)"));
+        assertTrue(full.contains("Executors.newFixedThreadPool(2)"));
         assertTrue(full.contains("Executors.newVirtualThreadPerTaskExecutor()"));
     }
 }

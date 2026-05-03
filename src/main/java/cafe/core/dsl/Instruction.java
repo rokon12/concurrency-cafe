@@ -45,4 +45,7 @@ public sealed interface Instruction {
 
     record NotifyAll(String monitorName, int line) implements Instruction {
     }
+
+    record Sleep(int durationMillis, int line) implements Instruction {
+    }
 }

@@ -179,6 +179,11 @@ public final class Parser {
             return;
         }
 
+        if (isWord(first, "Thread")) {
+            parseThreadSleep(out);
+            return;
+        }
+
         if (isSymbol(first, "++") || isSymbol(first, "--")) {
             parsePrefixIncrement(out);
             return;
@@ -475,6 +480,24 @@ public final class Parser {
                 "unsupported method '" + method + "' on " + type.description()
                     + " (try incrementAndGet, addAndGet, compareAndSet, set, lock, unlock, put, wait, notify, or notifyAll)");
         }
+    }
+
+    private void parseThreadSleep(List<Instruction> out) {
+        Token threadTok = peek();
+        advance();
+        expectSymbol(".");
+        expectWord("'sleep'", "sleep");
+        expectSymbol("(");
+        Token numTok = peek();
+        if (numTok.kind() != TokenKind.NUMBER) {
+            throw error(numTok,
+                "Thread.sleep(...) takes an integer literal duration in milliseconds");
+        }
+        advance();
+        expectSymbol(")");
+        expectSymbol(";");
+        int duration = Integer.parseInt(numTok.text());
+        out.add(new Instruction.Sleep(duration, threadTok.line()));
     }
 
     private void parsePrintln(List<Instruction> out) {

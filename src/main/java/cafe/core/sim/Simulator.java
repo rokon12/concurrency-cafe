@@ -139,7 +139,7 @@ public final class Simulator {
     }
 
     public SimulationResult snapshot() {
-        return new SimulationResult(events, globals, error);
+        return new SimulationResult(events, globals, error, ticks);
     }
 
     public SimulationResult runToCompletion() {
@@ -419,6 +419,29 @@ public final class Simulator {
             return true;
         }
 
+        if (next instanceof Instruction.Sleep sleep) {
+            if (chef.sleepRemaining == 0) {
+                int duration = sleep.durationMillis();
+                if (duration <= 0) {
+                    advanceAndMaybeRelease(chef);
+                    return true;
+                }
+                chef.sleepRemaining = duration - 1;
+                recordEvent(chef, sleep, "sleeps for " + duration + "ms");
+                if (chef.sleepRemaining == 0) {
+                    log(chef.name() + " wakes up");
+                    advanceAndMaybeRelease(chef);
+                }
+                return true;
+            }
+            chef.sleepRemaining--;
+            if (chef.sleepRemaining == 0) {
+                log(chef.name() + " wakes up");
+                advanceAndMaybeRelease(chef);
+            }
+            return true;
+        }
+
         if (next instanceof Instruction.NotifyAll notifyAll) {
             String mon = notifyAll.monitorName();
             if (!chef.holds(mon)) {
@@ -511,7 +534,9 @@ public final class Simulator {
                 continue;
             }
             String reason = null;
-            if (chef.waitingOnMonitor != null) {
+            if (chef.sleepRemaining > 0) {
+                reason = "sleeping (" + chef.sleepRemaining + "ms remaining)";
+            } else if (chef.waitingOnMonitor != null) {
                 reason = chef.waitingForReacquire
                     ? "waits to re-acquire '" + chef.waitingOnMonitor + "' after notify"
                     : "waits in wait set for '" + chef.waitingOnMonitor + "'";
@@ -549,6 +574,7 @@ public final class Simulator {
         private boolean executorSlotAcquired;
         private String waitingOnMonitor;
         private boolean waitingForReacquire;
+        private int sleepRemaining;
 
         boolean holds(String lock) {
             return heldLocks.contains(lock);
