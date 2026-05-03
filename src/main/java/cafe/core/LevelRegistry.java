@@ -2,12 +2,16 @@ package cafe.core;
 
 import cafe.core.levels.AtomicAddLevel;
 import cafe.core.levels.AtomicCounterLevel;
+import cafe.core.levels.AtomicReadModifyWriteLevel;
 import cafe.core.levels.DeadlockKitchenLevel;
+import cafe.core.levels.LockOrderingLevel;
 import cafe.core.levels.LostUpdateLevel;
 import cafe.core.levels.ManyChefsLevel;
+import cafe.core.levels.MonitorCounterLevel;
 import cafe.core.levels.ProducerConsumerLevel;
 import cafe.core.levels.ReentrantLockLevel;
-import cafe.core.levels.VirtualVsPlatformLevel;
+import cafe.core.levels.SameMonitorLevel;
+import cafe.core.levels.VirtualBlockingSleepLevel;
 import cafe.core.levels.WaitNotifyLevel;
 
 import java.util.List;
@@ -29,14 +33,18 @@ public record LevelRegistry(List<Level> levels) {
     public static LevelRegistry defaultRegistry() {
         return new LevelRegistry(List.of(
             new LostUpdateLevel(),
+            new MonitorCounterLevel(),
             new ManyChefsLevel(),
+            new SameMonitorLevel(),
             new AtomicCounterLevel(),
+            new AtomicReadModifyWriteLevel(),
             new AtomicAddLevel(),
             new ReentrantLockLevel(),
             new DeadlockKitchenLevel(),
+            new LockOrderingLevel(),
             new WaitNotifyLevel(),
             new ProducerConsumerLevel(),
-            new VirtualVsPlatformLevel()
+            new VirtualBlockingSleepLevel()
         ));
     }
 

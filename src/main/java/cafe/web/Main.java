@@ -851,14 +851,18 @@ public final class Main {
     private static String successTitleFor(Level level) {
         return switch (level.id()) {
             case "lost-update" -> "You sealed the race.";
+            case "monitor-counter" -> "Critical section secured.";
+            case "many-chefs" -> "All four counted.";
+            case "same-monitor" -> "One lock, one truth.";
             case "atomic-counter" -> "Lock-free, and it works.";
+            case "atomic-read-modify-write" -> "One atomic op, not two.";
             case "atomic-add" -> "+5, atomically.";
             case "reentrant-lock" -> "Lock acquired, released, repeat.";
             case "deadlock-kitchen" -> "Both chefs serve.";
-            case "many-chefs" -> "All four counted.";
+            case "lock-ordering" -> "Cycle broken.";
             case "wait-notify" -> "Signal received.";
             case "producer-consumer" -> "Orders flow.";
-            case "virtual-vs-platform" -> "Park, don't block.";
+            case "virtual-blocking-sleep" -> "Park, don't block.";
             default -> "Level complete.";
         };
     }
@@ -866,14 +870,18 @@ public final class Main {
     private static String successBodyFor(Level level) {
         return switch (level.id()) {
             case "lost-update" -> "Synchronizing the read+write makes it atomic — no other chef can sneak between the read and the write.";
+            case "monitor-counter" -> "Read and write together are the critical section. One monitor, all updates inside it — the loop is now safe to run from any number of threads.";
+            case "many-chefs" -> "The same lock that fixed two chefs scales to four. Synchronization serializes the work — that's the cost.";
+            case "same-monitor" -> "Synchronizing on a different object is the same as not synchronizing at all. The state and its guard have to share an identity.";
             case "atomic-counter" -> "AtomicInteger.incrementAndGet does the read+add+write as a single CAS — no lock, no contention.";
+            case "atomic-read-modify-write" -> "AtomicInteger isn't magic. get() and set() are each atomic, but the pair isn't. Use the operation that's atomic *as a whole*: incrementAndGet, addAndGet, compareAndSet.";
             case "atomic-add" -> "addAndGet(n) is just incrementAndGet generalized — atomically add anything you want, lock-free.";
             case "reentrant-lock" -> "ReentrantLock is the explicit cousin of synchronized: lock(), do work, unlock(). In real code wrap unlock in finally.";
             case "deadlock-kitchen" -> "Consistent lock ordering breaks the cycle. Every chef now grabs the oven first, then the fryer.";
-            case "many-chefs" -> "The same lock that fixed two chefs scales to four. Synchronization serializes the work — that's the cost.";
+            case "lock-ordering" -> "Same idea as the synchronized-deadlock level, made explicit with ReentrantLock. A global acquisition order — knife always before pan — is the only general fix.";
             case "wait-notify" -> "Object.wait() releases the monitor and parks the thread. Object.notify() wakes one waiter, which then re-acquires the monitor before returning. This is the primitive BlockingQueue is built on.";
             case "producer-consumer" -> "BlockingQueue is the cooperation primitive: producer parks when full, consumer parks when empty. The handoff is the lesson.";
-            case "virtual-vs-platform" -> "Virtual threads park instead of blocking an OS thread. With a small platform pool, this is the difference between a working app and a deadlocked one.";
+            case "virtual-blocking-sleep" -> "Virtual threads park without holding an OS thread. The platform pool stays free for tasks that actually need to run, and blocking work — sleeps, I/O, queue puts — doesn't starve the pool.";
             default -> "Bug squashed. On to the next.";
         };
     }
