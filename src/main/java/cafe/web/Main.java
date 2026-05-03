@@ -23,6 +23,7 @@ public final class Main {
     private static final String STORAGE_CURRENT = "cc.current";
     private static final String STORAGE_THEME = "cc.theme";
     private static final String STORAGE_DEV = "cc.dev";
+    private static final String STORAGE_HELP_SEEN = "cc.helpSeen";
     private static final String STORAGE_CODE_PREFIX = "cc.code.";
 
     private static final LevelRegistry REGISTRY = LevelRegistry.defaultRegistry();
@@ -57,6 +58,8 @@ public final class Main {
         Browser.onClick("prevBtn", Main::goToPrevious);
         Browser.onClick("nextBtn", Main::goToNext);
         Browser.onClick("themeBtn", Main::toggleTheme);
+        Browser.onClick("helpBtn", Main::openHelp);
+        Browser.onClick("helpCloseBtn", Main::closeHelp);
         Browser.onDevShortcut(Main::toggleDevMode);
         Browser.onClick("overlayCloseBtn", Main::closeOverlay);
         Browser.onClick("overlayNextBtn", Main::overlayNext);
@@ -78,6 +81,20 @@ public final class Main {
             }
         }
         loadLevel(startIndex);
+
+        // First-visit tutorial
+        if (!"1".equals(Browser.getStorage(STORAGE_HELP_SEEN))) {
+            openHelp();
+        }
+    }
+
+    private static void openHelp() {
+        Browser.setClassName("helpOverlay", "overlay");
+    }
+
+    private static void closeHelp() {
+        Browser.setClassName("helpOverlay", "overlay hidden");
+        Browser.setStorage(STORAGE_HELP_SEEN, "1");
     }
 
     private static void loadProgressFromStorage() {

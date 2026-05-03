@@ -20,6 +20,7 @@
       <span id="devBadge" class="dev-badge hidden" title="Dev mode is on — all levels accessible. Press Cmd/Ctrl+Shift+D to toggle.">DEV</span>
       <div class="spacer"></div>
       <div class="right">
+        <button id="helpBtn" class="ghost-btn" title="How it works">?</button>
         <button id="resetProgressBtn" class="ghost-btn" title="Clear all completed levels and saved code">Clear progress</button>
         <button id="themeBtn" class="ghost-btn" title="Toggle theme">☾</button>
       </div>
@@ -167,6 +168,104 @@
         <div class="overlay-actions">
           <button id="overlayCloseBtn" class="btn ghost">Stay here</button>
           <button id="overlayNextBtn" class="btn primary">Next level →</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="helpOverlay" class="overlay hidden">
+      <div class="overlay-card help-card">
+        <div class="overlay-eyebrow">How it works</div>
+        <h2>Welcome to Concurrency Café</h2>
+        <p class="help-lede">
+          Each level is a kitchen with a concurrency bug. Read the code, run it,
+          watch the threads collide, then fix it and watch the bug go away.
+        </p>
+
+        <div class="help-grid">
+          <div class="help-item">
+            <h3>1 · Your code</h3>
+            <p>The left pane is a real Java editor. Each chef is a virtual thread:</p>
+            <pre><code>Thread chef1 = Thread.ofVirtual().start(() -&gt; {
+    int x = counter;
+    counter = x + 1;
+});</code></pre>
+            <p>
+              Shared variables (<code>counter</code>, <code>queue</code>,
+              locks, executors&hellip;) are pre-declared by each level. Click
+              <em>Show full Java source</em> to see them — the file compiles
+              as-is on Java 21+.
+            </p>
+          </div>
+
+          <div class="help-item">
+            <h3>2 · The kitchen</h3>
+            <p>
+              The right pane visualizes the simulation. Each chef card shows
+              its status (idle, reading, writing, blocked&hellip;) and the value
+              of its locals. The center stage shows shared state — the int
+              counter, queue slots, lock holder.
+            </p>
+            <p>
+              When a chef takes the lock you'll see a <strong>holds lock</strong>
+              tag on its card. When the queue fills, the producer card shows
+              <em>waiting on queue</em>.
+            </p>
+          </div>
+
+          <div class="help-item">
+            <h3>3 · Run, Step, Play</h3>
+            <p>
+              <strong>Run to end</strong> simulates everything and shows pass / fail.
+              <strong>Step</strong> advances one chef instruction at a time —
+              the line that just ran lights up in the editor.
+              <strong>Play</strong> auto-steps every 500&nbsp;ms.
+            </p>
+            <p>
+              Each chef card has its own <em>Step chefN</em> button — click them
+              in any order to construct a specific interleaving (e.g., the
+              one that triggers the bug).
+            </p>
+          </div>
+
+          <div class="help-item">
+            <h3>4 · Fix the bug</h3>
+            <p>
+              The Java reference panel below shows what's valid for each
+              declared type. Mismatches like <code>counter.incrementAndGet()</code>
+              on an <code>int</code> get rejected at parse time with a hint.
+            </p>
+            <p>
+              After two failed runs the <strong>Hint</strong> card unlocks one
+              hint at a time. The level passes when the validator's condition
+              (top-right objective card) holds.
+            </p>
+          </div>
+
+          <div class="help-item">
+            <h3>5 · Shortcuts &amp; extras</h3>
+            <ul>
+              <li><kbd>Cmd</kbd>/<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>D</kbd> — dev mode (unlocks every level)</li>
+              <li><strong>☾ / ☀</strong> — switch dark / light theme</li>
+              <li><em>Download .java</em> — save the runnable Java file for the lesson</li>
+              <li><em>Reset starter</em> — wipe your edits and reload the level's starter</li>
+              <li><em>Clear progress</em> — wipe all completed levels and saved code</li>
+            </ul>
+          </div>
+
+          <div class="help-item">
+            <h3>6 · The curriculum</h3>
+            <p>
+              Eight levels in three chapters. Each new level introduces one
+              primitive: <code>synchronized</code>, <code>AtomicInteger</code>,
+              <code>ReentrantLock</code>, lock ordering, <code>BlockingQueue</code>,
+              and the difference between <code>Executors.newFixedThreadPool</code>
+              and <code>Executors.newVirtualThreadPerTaskExecutor</code>.
+            </p>
+          </div>
+        </div>
+
+        <div class="overlay-actions">
+          <button class="btn primary" id="helpCloseBtn">Got it</button>
         </div>
       </div>
     </div>
