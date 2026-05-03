@@ -36,4 +36,13 @@ public sealed interface Instruction {
 
     record QueueTake(String localName, String queueName, int line) implements Instruction {
     }
+
+    record Wait(String monitorName, int line) implements Instruction {
+    }
+
+    record Notify(String monitorName, int line) implements Instruction {
+    }
+
+    record NotifyAll(String monitorName, int line) implements Instruction {
+    }
 }

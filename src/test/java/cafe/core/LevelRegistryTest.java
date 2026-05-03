@@ -12,15 +12,16 @@ class LevelRegistryTest {
     void defaultRegistryListsLevelsInTeachingOrder() {
         LevelRegistry registry = LevelRegistry.defaultRegistry();
 
-        assertEquals(8, registry.size());
+        assertEquals(9, registry.size());
         assertEquals("lost-update", registry.get(0).id());
         assertEquals("many-chefs", registry.get(1).id());
         assertEquals("atomic-counter", registry.get(2).id());
         assertEquals("atomic-add", registry.get(3).id());
         assertEquals("reentrant-lock", registry.get(4).id());
         assertEquals("deadlock-kitchen", registry.get(5).id());
-        assertEquals("producer-consumer", registry.get(6).id());
-        assertEquals("virtual-vs-platform", registry.get(7).id());
+        assertEquals("wait-notify", registry.get(6).id());
+        assertEquals("producer-consumer", registry.get(7).id());
+        assertEquals("virtual-vs-platform", registry.get(8).id());
     }
 
     @Test
@@ -33,8 +34,9 @@ class LevelRegistryTest {
         assertEquals(3, registry.indexOf("atomic-add"));
         assertEquals(4, registry.indexOf("reentrant-lock"));
         assertEquals(5, registry.indexOf("deadlock-kitchen"));
-        assertEquals(6, registry.indexOf("producer-consumer"));
-        assertEquals(7, registry.indexOf("virtual-vs-platform"));
+        assertEquals(6, registry.indexOf("wait-notify"));
+        assertEquals(7, registry.indexOf("producer-consumer"));
+        assertEquals(8, registry.indexOf("virtual-vs-platform"));
         assertEquals(-1, registry.indexOf("nonexistent"));
     }
 

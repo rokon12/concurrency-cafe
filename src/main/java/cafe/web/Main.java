@@ -856,6 +856,7 @@ public final class Main {
             case "reentrant-lock" -> "Lock acquired, released, repeat.";
             case "deadlock-kitchen" -> "Both chefs serve.";
             case "many-chefs" -> "All four counted.";
+            case "wait-notify" -> "Signal received.";
             case "producer-consumer" -> "Orders flow.";
             case "virtual-vs-platform" -> "Park, don't block.";
             default -> "Level complete.";
@@ -870,6 +871,7 @@ public final class Main {
             case "reentrant-lock" -> "ReentrantLock is the explicit cousin of synchronized: lock(), do work, unlock(). In real code wrap unlock in finally.";
             case "deadlock-kitchen" -> "Consistent lock ordering breaks the cycle. Every chef now grabs the oven first, then the fryer.";
             case "many-chefs" -> "The same lock that fixed two chefs scales to four. Synchronization serializes the work — that's the cost.";
+            case "wait-notify" -> "Object.wait() releases the monitor and parks the thread. Object.notify() wakes one waiter, which then re-acquires the monitor before returning. This is the primitive BlockingQueue is built on.";
             case "producer-consumer" -> "BlockingQueue is the cooperation primitive: producer parks when full, consumer parks when empty. The handoff is the lesson.";
             case "virtual-vs-platform" -> "Virtual threads park instead of blocking an OS thread. With a small platform pool, this is the difference between a working app and a deadlocked one.";
             default -> "Bug squashed. On to the next.";

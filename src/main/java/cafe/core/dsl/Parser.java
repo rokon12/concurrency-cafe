@@ -447,9 +447,33 @@ public final class Parser {
                 Expression rewritten = liftGlobalReads(args.get(0), out, line);
                 out.add(new Instruction.QueuePut(target, rewritten, line));
             }
+            case "wait" -> {
+                requireType(type, SharedType.MonitorType.class, targetTok, target,
+                    "'.wait()' is only valid on an Object monitor");
+                if (!args.isEmpty()) {
+                    throw error(methodTok, "'wait' takes no arguments");
+                }
+                out.add(new Instruction.Wait(target, line));
+            }
+            case "notify" -> {
+                requireType(type, SharedType.MonitorType.class, targetTok, target,
+                    "'.notify()' is only valid on an Object monitor");
+                if (!args.isEmpty()) {
+                    throw error(methodTok, "'notify' takes no arguments");
+                }
+                out.add(new Instruction.Notify(target, line));
+            }
+            case "notifyAll" -> {
+                requireType(type, SharedType.MonitorType.class, targetTok, target,
+                    "'.notifyAll()' is only valid on an Object monitor");
+                if (!args.isEmpty()) {
+                    throw error(methodTok, "'notifyAll' takes no arguments");
+                }
+                out.add(new Instruction.NotifyAll(target, line));
+            }
             default -> throw error(methodTok,
                 "unsupported method '" + method + "' on " + type.description()
-                    + " (try incrementAndGet, addAndGet, compareAndSet, set, lock, unlock, or put)");
+                    + " (try incrementAndGet, addAndGet, compareAndSet, set, lock, unlock, put, wait, notify, or notifyAll)");
         }
     }
 

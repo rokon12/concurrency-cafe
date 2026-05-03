@@ -8,6 +8,7 @@ import cafe.core.levels.ManyChefsLevel;
 import cafe.core.levels.ProducerConsumerLevel;
 import cafe.core.levels.ReentrantLockLevel;
 import cafe.core.levels.VirtualVsPlatformLevel;
+import cafe.core.levels.WaitNotifyLevel;
 
 import java.util.List;
 
@@ -33,6 +34,7 @@ public record LevelRegistry(List<Level> levels) {
             new AtomicAddLevel(),
             new ReentrantLockLevel(),
             new DeadlockKitchenLevel(),
+            new WaitNotifyLevel(),
             new ProducerConsumerLevel(),
             new VirtualVsPlatformLevel()
         ));

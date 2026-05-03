@@ -25,6 +25,7 @@ public final class Simulator {
     private final Map<String, String> lockOwner = new HashMap<>();
     private final Map<String, Deque<Integer>> queues = new LinkedHashMap<>();
     private final Map<String, Integer> queueCapacity = new HashMap<>();
+    private final Map<String, Deque<String>> waitSets = new LinkedHashMap<>();
     private final List<String> events = new ArrayList<>();
     private final List<ChefState> chefs = new ArrayList<>();
     private int ticks;
@@ -223,6 +224,27 @@ public final class Simulator {
     }
 
     private boolean step(ChefState chef) {
+        // Chef is parked in a monitor's wait set — only proceeds after a notify
+        // has flagged it for re-acquisition, and even then only when the
+        // monitor is free.
+        if (chef.waitingOnMonitor != null) {
+            if (!chef.waitingForReacquire) {
+                return false;
+            }
+            String mon = chef.waitingOnMonitor;
+            String holder = lockOwner.get(mon);
+            if (holder != null && !holder.equals(chef.name())) {
+                return false;
+            }
+            lockOwner.put(mon, chef.name());
+            chef.recordHeld(mon);
+            chef.waitingOnMonitor = null;
+            chef.waitingForReacquire = false;
+            log(chef.name() + " re-acquires '" + mon + "' after notify");
+            advanceAndMaybeRelease(chef);
+            return true;
+        }
+
         String poolName = chef.program.executorName();
         if (poolName != null && !chef.executorSlotAcquired) {
             int cap = executorPoolSize.getOrDefault(poolName, Integer.MAX_VALUE);
@@ -359,7 +381,77 @@ public final class Simulator {
             return true;
         }
 
+        if (next instanceof Instruction.Wait wait) {
+            String mon = wait.monitorName();
+            if (!chef.holds(mon)) {
+                throw new SimulationException(chef.name()
+                    + " called wait() on '" + mon + "' without holding the monitor"
+                    + " (IllegalMonitorStateException)");
+            }
+            chef.releases(mon);
+            lockOwner.remove(mon);
+            chef.waitingOnMonitor = mon;
+            waitSets.computeIfAbsent(mon, k -> new ArrayDeque<>()).addLast(chef.name());
+            recordEvent(chef, wait, "waits on '" + mon + "' (releases lock)");
+            // Don't advance past the Wait — chef stays here until re-acquisition.
+            return true;
+        }
+
+        if (next instanceof Instruction.Notify notify) {
+            String mon = notify.monitorName();
+            if (!chef.holds(mon)) {
+                throw new SimulationException(chef.name()
+                    + " called notify() on '" + mon + "' without holding the monitor"
+                    + " (IllegalMonitorStateException)");
+            }
+            Deque<String> waiters = waitSets.get(mon);
+            if (waiters != null && !waiters.isEmpty()) {
+                String waiterName = waiters.pollFirst();
+                ChefState waiter = findChefByName(waiterName);
+                if (waiter != null) {
+                    waiter.waitingForReacquire = true;
+                }
+                recordEvent(chef, notify, "notifies '" + mon + "' (woke " + waiterName + ")");
+            } else {
+                recordEvent(chef, notify, "notifies '" + mon + "' (no waiters)");
+            }
+            advanceAndMaybeRelease(chef);
+            return true;
+        }
+
+        if (next instanceof Instruction.NotifyAll notifyAll) {
+            String mon = notifyAll.monitorName();
+            if (!chef.holds(mon)) {
+                throw new SimulationException(chef.name()
+                    + " called notifyAll() on '" + mon + "' without holding the monitor"
+                    + " (IllegalMonitorStateException)");
+            }
+            Deque<String> waiters = waitSets.get(mon);
+            int count = 0;
+            if (waiters != null) {
+                count = waiters.size();
+                for (String waiterName : waiters) {
+                    ChefState waiter = findChefByName(waiterName);
+                    if (waiter != null) {
+                        waiter.waitingForReacquire = true;
+                    }
+                }
+                waiters.clear();
+            }
+            recordEvent(chef, notifyAll,
+                "notifies all on '" + mon + "' (woke " + count + ")");
+            advanceAndMaybeRelease(chef);
+            return true;
+        }
+
         throw new SimulationException("Unknown instruction: " + next);
+    }
+
+    private ChefState findChefByName(String name) {
+        for (ChefState c : chefs) {
+            if (c.name().equals(name)) return c;
+        }
+        return null;
     }
 
     private void recordEvent(ChefState chef, Instruction instr, String detail) {
@@ -418,16 +510,22 @@ public final class Simulator {
             if (chef.done()) {
                 continue;
             }
-            Instruction next = chef.peek();
             String reason = null;
-            if (next instanceof Instruction.Lock l) {
-                String holder = lockOwner.get(l.lockName());
-                reason = "waits on lock '" + l.lockName() + "' held by "
-                    + (holder == null ? "?" : holder);
-            } else if (next instanceof Instruction.QueuePut put) {
-                reason = "waits to put into '" + put.queueName() + "' (full)";
-            } else if (next instanceof Instruction.QueueTake take) {
-                reason = "waits to take from '" + take.queueName() + "' (empty)";
+            if (chef.waitingOnMonitor != null) {
+                reason = chef.waitingForReacquire
+                    ? "waits to re-acquire '" + chef.waitingOnMonitor + "' after notify"
+                    : "waits in wait set for '" + chef.waitingOnMonitor + "'";
+            } else {
+                Instruction next = chef.peek();
+                if (next instanceof Instruction.Lock l) {
+                    String holder = lockOwner.get(l.lockName());
+                    reason = "waits on lock '" + l.lockName() + "' held by "
+                        + (holder == null ? "?" : holder);
+                } else if (next instanceof Instruction.QueuePut put) {
+                    reason = "waits to put into '" + put.queueName() + "' (full)";
+                } else if (next instanceof Instruction.QueueTake take) {
+                    reason = "waits to take from '" + take.queueName() + "' (empty)";
+                }
             }
             if (reason != null) {
                 if (!first) sb.append("; ");
@@ -449,6 +547,12 @@ public final class Simulator {
         private int pc;
         private String lastEventDetail;
         private boolean executorSlotAcquired;
+        private String waitingOnMonitor;
+        private boolean waitingForReacquire;
+
+        boolean holds(String lock) {
+            return heldLocks.contains(lock);
+        }
 
         ChefState(ChefProgram program) {
             this.program = program;
