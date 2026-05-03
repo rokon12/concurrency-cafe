@@ -153,6 +153,17 @@ public final class Main {
         Browser.setText("objectiveGoalLabel", level.passingCondition());
         Browser.setEditorCode(editorContent);
 
+        // Build a simulator from the loaded code so the kitchen previews
+        // real chef names + initial state before the user clicks Run / Step.
+        // Parse failures fall back to the generic placeholder.
+        try {
+            activeSimulator = level.startSimulation(editorContent);
+            activeSimulatorCode = editorContent;
+        } catch (RuntimeException ignore) {
+            activeSimulator = null;
+            activeSimulatorCode = null;
+        }
+
         renderInitialState(level);
         renderFullSource();
         renderBreadcrumb();
@@ -163,7 +174,11 @@ public final class Main {
     }
 
     private static void renderInitialState(Level level) {
-        Browser.setHtml("kitchenView", emptyKitchenHtml(level));
+        if (activeSimulator != null) {
+            renderKitchen(activeSimulator.snapshot(), level);
+        } else {
+            Browser.setHtml("kitchenView", emptyKitchenHtml(level));
+        }
         Browser.setHtml("eventLog", "");
         Browser.setHtml("resultBar", idleResultHtml());
         Browser.setText("stepCounter", "step 0 / 0");
