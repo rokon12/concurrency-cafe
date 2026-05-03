@@ -89,7 +89,9 @@ public final class Browser {
 
     @JSBody(
         params = { "id", "callback" },
-        script = "document.getElementById(id).addEventListener('click', callback);"
+        script =
+            "var el = document.getElementById(id);" +
+            "if (el) el.addEventListener('click', callback);"
     )
     public static native void onClick(String id, Callback callback);
 
@@ -157,7 +159,9 @@ public final class Browser {
     @JSBody(
         params = { "containerId", "attribute", "callback" },
         script =
-            "document.getElementById(containerId).addEventListener('click', function(e) {" +
+            "var c = document.getElementById(containerId);" +
+            "if (!c) return;" +
+            "c.addEventListener('click', function(e) {" +
             "  var t = e.target;" +
             "  while (t && t.getAttribute && t.getAttribute(attribute) === null) { t = t.parentElement; }" +
             "  if (t && t.getAttribute) {" +

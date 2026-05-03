@@ -65,7 +65,6 @@ public final class Main {
         Browser.onClick("overlayNextBtn", Main::overlayNext);
         Browser.onClickInside("breadcrumb", "data-level-index", Main::switchToLevel);
         Browser.onClickInside("kitchenView", "data-chef-index", Main::stepSpecificChef);
-        Browser.onClickInside("simTabs", "data-tab-key", Main::switchTab);
         Browser.onClick("tabViz", () -> setTab("viz"));
         Browser.onClick("tabLog", () -> setTab("log"));
 
@@ -823,10 +822,6 @@ public final class Main {
     private static void renderSchedulePanel() {
         // Schedule controls were merged into chef cards (each card has a Step button)
         // Chef step buttons are rendered as part of the kitchen view.
-    }
-
-    private static void switchTab(int unused) {
-        // unused; we handle tabs via setTab
     }
 
     private static void setTab(String tab) {
